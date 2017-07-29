@@ -13,26 +13,52 @@
 "use strict";
 
 const pressedKeys = {};
-let frameBuildup = 1;
-let width, height;
+let width = canvas.width;
+let height = canvas.height;
+let quality = 1;
 let pixelation = 0;
+let frameBuildup = 1;
 let t = 0;
+let camera = {x: width/2, y: height/2, scale: 1};
+let battery = 1;
+let batteryDrain = 0.001;
 
 function update() {
     const qualityDropSpeed = 1/120;
-    const quality = Math.abs(Math.sin(t*qualityDropSpeed));
+    //quality = Math.abs(Math.sin(t*qualityDropSpeed));
+    quality = Math.min(0.5, battery) * 2;
     pixelation = 16 * (1-quality);
     frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
+    battery = Math.max(battery-batteryDrain, 0) || 1;
+
+    const speed = 10;
+    if (pressedKeys['left']) camera.x += speed;
+    if (pressedKeys['right']) camera.x -= speed;
+    if (pressedKeys['up']) camera.y += speed;
+    if (pressedKeys['down']) camera.y -= speed;
 }
 
 function render(ctx) {
-    ctx.beginPath();
-    ctx.arc(width/2+Math.cos(t/130)*100, height/2+Math.sin(t/130)*100, Math.min(width, height)/4, 0, 2 * Math.PI, false);
-    ctx.fillStyle = 'green';
-    ctx.fill();
     ctx.lineWidth = 10;
-    ctx.strokeStyle = '#003300';
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.shadowBlur = 10;
+
+    ctx.beginPath();
+    ctx.arc(0, 0, 15, 0, 2 * Math.PI, false);
+    ctx.fillStyle = '#0000FF';
+    ctx.shadowColor = '#0000FF';
+    ctx.fill();
+    ctx.strokeStyle = '#000066';
     ctx.stroke();
+
+    ctx.save();
+    ctx.shadowColor = '#00FF00';
+    ctx.beginPath();
+    ctx.fillStyle = 'rgb(0, ' + battery*0xFF + ', 0)';
+    ctx.arc(0, 0, 5, 0, 2 * Math.PI, false);
+    ctx.fill();
+    ctx.restore();
 }
 
 function setup(update, render) {
@@ -47,7 +73,7 @@ function setup(update, render) {
         t++;
 
         update();
-        frameReady += frameBuildup;
+        frameReady += frameBuildup + 0.01;
 
         if (frameReady >= 1) {
             frameReady -= 1;
@@ -61,6 +87,8 @@ function setup(update, render) {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.scale(scaling, scaling);
 
+            ctx.scale(camera.scale, camera.scale);
+            ctx.translate(camera.x, camera.y);
             render(ctx);
 
             ctx.restore();
@@ -99,7 +127,7 @@ function setup(update, render) {
         processKeyEvent(event, true);
     });
     window.addEventListener('keyup', function(event) {
-        processKeyEvent(event, true);
+        processKeyEvent(event, false);
     });
 }
 
