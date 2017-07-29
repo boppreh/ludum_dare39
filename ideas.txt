@@ -15,7 +15,7 @@ If power runs out you:
 [ ] can't act anymore
 [ ] take damage
 [ ] attract danger
-[ ] lose points (arcade)
+[ ] lose points
 [ ] explode and continue with other unit
 
 To restore power you can:
@@ -26,3 +26,26 @@ To restore power you can:
 [ ] perform tricks
 [ ] take risks
 [ ] go to a special location
+
+Power drain is visible by:
+[ ] action results (slower, less damage)
+[ ] bar
+[ ] countdown
+[ ] flashing
+[ ] visual quality drop (glow, shadow, pixel count, FPS, particles)
+[ ] smaller field of view
+[ ] more or less of certain world objects
+[ ] hallucinations
+
+Gameplay is:
+[ ] fast paced
+[ ] slow paced
+[ ] turn based
+[ ] shooter
+[ ] puzzle
+[ ] top-down
+[ ] sideways platformer
+[ ] shoot-em-up
+[ ] text-based
+[ ] RPG
+[ ] arcade
