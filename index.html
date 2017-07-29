@@ -17,33 +17,60 @@ const ctx = canvas.getContext('2d');
 ctx.mozImageSmoothingEnabled = false;
 ctx.webkitImageSmoothingEnabled = false;
 ctx.imageSmoothingEnabled = false;
+let frameReady = 0;
+let frameBuildup = 1;
+let width, height;
+let pixelation = 0;
 
 let t = 0;
+
 function update() {
-    t++;
+    const maxPixelation = 16;
+    const qualityDropSpeed = 1/120;
+    const quality = Math.abs(Math.sin(t*qualityDropSpeed));
+    const maxSkippedFrames = 0.95;
 
-    let maxPixelated = 16;
-    let pixelationSpeed = 1/120;
-    let scaling = 1 / ((maxPixelated - 1) * Math.abs(Math.sin(t*pixelationSpeed)) + 1);
-    let width = scaling * canvas.width;
-    let height = scaling * canvas.height;
+    pixelation = (maxPixelation - 1) * quality + 1;
+    frameBuildup = 1 - maxSkippedFrames * quality;
+}
 
-    ctx.fillStyle = '#111';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+function render() {
     ctx.beginPath();
-    ctx.arc(width/2+Math.cos(t/130)*scaling*100, height/2+Math.sin(t/130)*scaling*100, Math.min(width, height)/4, 0, 2 * Math.PI, false);
+    ctx.arc(width/2+Math.cos(t/130)*100, height/2+Math.sin(t/130)*100, Math.min(width, height)/4, 0, 2 * Math.PI, false);
     ctx.fillStyle = 'green';
     ctx.fill();
-    ctx.lineWidth = scaling * 10;
+    ctx.lineWidth = 10;
     ctx.strokeStyle = '#003300';
     ctx.stroke();
-
-    ctx.drawImage(canvas, 0, 0, width, height, 0, 0, canvas.width, canvas.height);
-
-    window.requestAnimationFrame(update);
 }
-window.requestAnimationFrame(update);
+
+function updateFrame() {
+    t++;
+
+    update();
+    frameReady += frameBuildup;
+
+    if (frameReady >= 1) {
+        frameReady -= 1;
+
+        const scaling = 1 / pixelation;
+        width = canvas.width;
+        height = canvas.height;
+
+        ctx.save();
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.scale(scaling, scaling);
+
+        render();
+
+        ctx.restore();
+        ctx.drawImage(canvas, 0, 0, width*scaling, height*scaling, 0, 0, canvas.width, canvas.height);
+    }
+
+    window.requestAnimationFrame(updateFrame);
+}
+window.requestAnimationFrame(updateFrame);
         </script>
     </body>
 </html>
