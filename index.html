@@ -108,10 +108,10 @@ updating.add(function() {
     }
 
     if (t % 100 == 0) {
-        const color = ['#FF5555', '#6666FF', '#FFFF66'][Math.floor(Math.random()*3)];
+        const color = ['#FF5555', '#6666FF', '#FFFF66', '#FFFFFF'][Math.floor(Math.random()*4)];
         // http://japaneseemoticons.me/all-japanese-emoticons/
         const text = '(╯°□°）╯︵ ┻━┻ ' + Math.ceil(Math.random() * 100);
-        messages.push({text: text, time: 310, color: color});
+        messages.push({text: text, time: 310, color: color, bold: color=='#FFFFFF'});
     }
 });
 
@@ -121,7 +121,6 @@ ui.add(function(ctx) {
     const margin = 10;
     const padding = 3;
     const fadeTime = 120;
-    ctx.font = fontSize + 'px courier new';
     ctx.lineWidth = 5;
     ctx.strokeStyle = 'black';
     for (let i = 0; i < messages.length; i++) {
@@ -129,6 +128,7 @@ ui.add(function(ctx) {
         const alpha = Math.min(1, message.time/fadeTime);
         ctx.globalAlpha = alpha;
         ctx.fillStyle = message.color;
+        ctx.font = (message.bold ? 'bold ' : '') + fontSize + 'px courier new';
         const x = margin;
         const y = height-(messages.length-i-1)*(fontSize+padding) - margin;
         ctx.strokeText(message.text, margin, y);
