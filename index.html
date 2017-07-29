@@ -90,18 +90,13 @@ function renderWorld(ctx) {
     // Draw player base.
     ctx.save();
     ctx.lineWidth = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(player.x, player.y, 15, 0, 2 * Math.PI, false);
     ctx.fillStyle = '#0000FF';
-    ctx.shadowColor = '#0000FF';
     ctx.fill();
     ctx.strokeStyle = '#000066';
     ctx.stroke();
     // Draw player battery cell.
-    ctx.shadowColor = '#00FF00';
     ctx.beginPath();
     ctx.fillStyle = 'rgb(0, ' + Math.pow(battery, 1.8)*0xFF + ', 0)';
     ctx.arc(player.x, player.y, 5, 0, 2 * Math.PI, false);
