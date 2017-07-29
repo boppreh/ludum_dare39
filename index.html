@@ -156,18 +156,50 @@ player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50,
 }, function(ctx) {
     // Draw base.
     ctx.save();
+    ctx.translate(this.x, this.y);
     ctx.strokeStyle = '#0000FF';
     ctx.shadowColor = '#0000FF';
     ctx.shadowBlur = 10;
     ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.width/2, 0, 2 * Math.PI);
+    ctx.arc(0, 0, this.width/2, 0, 2 * Math.PI);
     ctx.stroke();
     // Draw battery cell.
     ctx.fillStyle = 'rgb(0, ' + Math.pow(this.battery, 1.8)*0xFF + ', 0)';
     ctx.beginPath();
-    ctx.arc(this.x, this.y, 5, 0, 2 * Math.PI);
+    ctx.arc(0, 0, 5, 0, 2 * Math.PI);
     ctx.fill();
+    ctx.restore();
+});
+
+let drone = makeObject({x: world.width/2, y: world.height/2}, function() {
+    if (this.target === undefined || (this.target.x === this.x && this.target.y === this.y)) {
+        const delta = [{x: +1, y: 0}, {x: -1, y: 0}, {x: 0, y: +1}, {x: 0, y: -1}][Math.floor(Math.random()*4)];
+        this.target = {
+            x: gridSize * Math.round(this.x/gridSize + delta.x),
+            y: gridSize * Math.round(this.y/gridSize + delta.y),
+        };
+    }
+
+    if (this.target.x > this.x) this.x += 1;
+    if (this.target.x < this.x) this.x -= 1;
+    if (this.target.y > this.y) this.y += 1;
+    if (this.target.y < this.y) this.y -= 1;
+}, function(ctx) {
+    ctx.save();
+    ctx.strokeStyle = '#FF0000';
+    ctx.shadowColor = '#FF0000';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 6;
+    ctx.translate(this.x, this.y);
+    const angle = Math.atan2(this.y-this.target.y, this.x-this.target.x);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(-20, 0);
+    ctx.lineTo(+20, 20);
+    ctx.lineTo(+20, -20);
+    ctx.closePath();
+    ctx.stroke();
     ctx.restore();
 });
 
