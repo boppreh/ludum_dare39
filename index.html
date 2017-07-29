@@ -13,15 +13,18 @@
 "use strict";
 
 const pressedKeys = {};
+const gridSize = 50;
 let width = canvas.width;
 let height = canvas.height;
 let quality = 1;
 let pixelation = 0;
 let frameBuildup = 1;
 let t = 0;
-let camera = {x: width/2, y: height/2, scale: 1};
+let world = {width: 10000, height: 10000};
+let camera = {x: 0, y: 0, scale: 1};
 let battery = 1;
 let batteryDrain = 0.001;
+let player = {x: world.width/2, y: world.height/2, inertia: {x: 0, y: 0}, friction: 0.9};
 
 function update() {
     const qualityDropSpeed = 1/120;
@@ -31,21 +34,42 @@ function update() {
     frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
     battery = Math.max(battery-batteryDrain, 0) || 1;
 
-    const speed = 10;
-    if (pressedKeys['left']) camera.x += speed;
-    if (pressedKeys['right']) camera.x -= speed;
-    if (pressedKeys['up']) camera.y += speed;
-    if (pressedKeys['down']) camera.y -= speed;
+    const movementForce = 1;
+    if (pressedKeys['left']) player.inertia.x -= movementForce;
+    if (pressedKeys['right']) player.inertia.x += movementForce;
+    if (pressedKeys['up']) player.inertia.y -= movementForce;
+    if (pressedKeys['down']) player.inertia.y += movementForce;
+    player.x += player.inertia.x;
+    player.y += player.inertia.y;
+    player.inertia.x *= player.friction;
+    player.inertia.y *= player.friction;
+
+    camera.x = -player.x + width/2;
+    camera.y = -player.y + height/2;
 }
 
-function render(ctx) {
+function renderWorld(ctx) {
+    ctx.save();
+    ctx.strokeStyle = '#00FF00';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= world.width; x += gridSize) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, world.height);
+    }
+    for (let y = 0; y <= world.height; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(world.width, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+
     ctx.lineWidth = 10;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
     ctx.shadowBlur = 10;
 
     ctx.beginPath();
-    ctx.arc(0, 0, 15, 0, 2 * Math.PI, false);
+    ctx.arc(player.x, player.y, 15, 0, 2 * Math.PI, false);
     ctx.fillStyle = '#0000FF';
     ctx.shadowColor = '#0000FF';
     ctx.fill();
@@ -55,13 +79,17 @@ function render(ctx) {
     ctx.save();
     ctx.shadowColor = '#00FF00';
     ctx.beginPath();
-    ctx.fillStyle = 'rgb(0, ' + battery*0xFF + ', 0)';
-    ctx.arc(0, 0, 5, 0, 2 * Math.PI, false);
+    ctx.fillStyle = 'rgb(0, ' + Math.pow(battery, 1.8)*0xFF + ', 0)';
+    ctx.arc(player.x, player.y, 5, 0, 2 * Math.PI, false);
     ctx.fill();
     ctx.restore();
 }
 
-function setup(update, render) {
+function renderUI(ctx) {
+
+}
+
+(function() {
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     ctx.webkitImageSmoothingEnabled = false;
@@ -89,10 +117,14 @@ function setup(update, render) {
 
             ctx.scale(camera.scale, camera.scale);
             ctx.translate(camera.x, camera.y);
-            render(ctx);
+            renderWorld(ctx);
 
             ctx.restore();
             ctx.drawImage(canvas, 0, 0, width*scaling, height*scaling, 0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            renderUI(ctx);
+            ctx.restore();
         }
 
         window.requestAnimationFrame(updateFrame);
@@ -129,9 +161,7 @@ function setup(update, render) {
     window.addEventListener('keyup', function(event) {
         processKeyEvent(event, false);
     });
-}
-
-setup(update, render);
+})();
         </script>
     </body>
 </html>
