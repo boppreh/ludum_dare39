@@ -1,0 +1,28 @@
+# The Theme for Ludum Dare 39 is: Running out of Power
+
+Power is reduced by:
+[ ] clock
+[ ] movement
+[ ] attacking
+[ ] any action
+[ ] enemy draining
+[ ] pickups
+[ ] giving away
+
+If power runs out you:
+[ ] die
+[ ] can't move anymore
+[ ] can't act anymore
+[ ] take damage
+[ ] attract danger
+[ ] lose points (arcade)
+[ ] explode and continue with other unit
+
+To restore power you can:
+[ ] do nothing
+[ ] wait
+[ ] pickup items
+[ ] use items
+[ ] perform tricks
+[ ] take risks
+[ ] go to a special location
