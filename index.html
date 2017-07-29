@@ -6,7 +6,7 @@
     </head>
 
     <body style='background: black;'>
-        <canvas id='canvas' width=800 height=600 style='display: block; margin-left: auto; margin-right: auto;'></canvas>
+        <canvas id='canvas' width=800 height=600 style='display: block; margin-left: auto; margin-right: auto; margin: auto; display: block; image-rendering: optimizeSpeed; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: -o-crisp-edges; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;'></canvas>
 
         <script>
 "use strict";
@@ -67,14 +67,16 @@ rendering.add(function(ctx) {
     // Draw grid.
     ctx.save();
     ctx.fillRect(0, 0, world.width, world.height);
-    ctx.shadowColor = '#00FF00';
-    ctx.shadowBlur = 8;
-    ctx.strokeStyle = '#005500';
-    ctx.lineWidth = 1;
     const startX = Math.floor((player.x-player.width /2) / gridSize) * gridSize;
     const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
     const endX =   Math.ceil ((player.x+player.width /2) / gridSize) * gridSize;
     const endY =   Math.ceil ((player.y+player.height/2) / gridSize) * gridSize;
+    ctx.fillStyle = '#000022';
+    ctx.fillRect(startX, startY, endX - startX, endY - startY);
+    ctx.shadowColor = '#00FF00';
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#005500';
+    ctx.lineWidth = 1;
     for (let x = 0; x <= world.width; x += gridSize) {
         ctx.moveTo(x, 0);
         if (x > startX && x < endX) {
@@ -106,8 +108,9 @@ updating.add(function() {
     }
 
     if (t % 100 == 0) {
-        const color = Math.random() > 0.5 ? '#FF5555' : '#6666FF';
-        const text = 'Hey! ' + Math.ceil(Math.random() * 100);
+        const color = ['#FF5555', '#6666FF', '#FFFF66'][Math.floor(Math.random()*3)];
+        // http://japaneseemoticons.me/all-japanese-emoticons/
+        const text = '(╯°□°）╯︵ ┻━┻ ' + Math.ceil(Math.random() * 100);
         messages.push({text: text, time: 310, color: color});
     }
 });
@@ -186,7 +189,6 @@ function makeRingEffect(x, y, color) {
 
 (function() {
     const canvas = document.getElementById('canvas');
-    canvas.style = 'margin: auto; display: block; image-rendering: optimizeSpeed; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: -o-crisp-edges; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;'
     const ctx = canvas.getContext('2d');
     ctx.webkitImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
@@ -195,7 +197,11 @@ function makeRingEffect(x, y, color) {
     height = canvas.height;
 
     const buffer = document.createElement("canvas");
-    buffer.style = 'image-rendering: optimizeSpeed; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: -o-crisp-edges; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;'
+    buffer.style['image-rendering'] = '-moz-crisp-edges';
+    buffer.style['image-rendering'] = '-webkit-optimize-contrast';
+    buffer.style['image-rendering'] = '-o-crisp-edges';
+    buffer.style['image-rendering'] = 'crisp-edges';
+    buffer.style['-ms-interpolation-mode'] = 'nearest-neighbor;';
     buffer.width = width;
     buffer.height = height;
     const bufferCtx = buffer.getContext('2d');
