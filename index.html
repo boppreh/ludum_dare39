@@ -61,6 +61,78 @@ function makeObject(obj, updateFn, renderFn) {
     return obj;
 }
 
+// Draw grid.
+rendering.add(function(ctx) {
+    ctx.fillStyle = 'black';
+    // Draw grid.
+    ctx.save();
+    ctx.fillRect(0, 0, world.width, world.height);
+    ctx.shadowColor = '#00FF00';
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#005500';
+    ctx.lineWidth = 1;
+    const startX = Math.floor((player.x-player.width /2) / gridSize) * gridSize;
+    const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
+    const endX =   Math.ceil ((player.x+player.width /2) / gridSize) * gridSize;
+    const endY =   Math.ceil ((player.y+player.height/2) / gridSize) * gridSize;
+    for (let x = 0; x <= world.width; x += gridSize) {
+        ctx.moveTo(x, 0);
+        if (x > startX && x < endX) {
+            ctx.lineTo(x, startY);
+            ctx.moveTo(x, endY);
+        }
+        ctx.lineTo(x, world.height);
+    }
+    for (let y = 0; y <= world.height; y += gridSize) {
+        ctx.moveTo(0, y);
+        if (y > startY && y < endY) {
+            ctx.lineTo(startX, y);
+            ctx.moveTo(endX, y);
+        }
+        ctx.lineTo(world.width, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+});
+
+// Update messages.
+updating.add(function() {
+    for (let i = messages.length-1; i >= 0; i--) {
+        const message = messages[i];
+        message.time -= 1;
+        if (message.time <= 0) {
+            messages.splice(i, 1);
+        }
+    }
+
+    if (t % 100 == 0) {
+        const color = Math.random() > 0.5 ? '#FF5555' : '#6666FF';
+        const text = 'Hey! ' + Math.ceil(Math.random() * 100);
+        messages.push({text: text, time: 310, color: color});
+    }
+});
+
+// Render messages.
+ui.add(function(ctx) {
+    const fontSize = 30;
+    const margin = 10;
+    const padding = 3;
+    const fadeTime = 120;
+    ctx.font = fontSize + 'px courier new';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'black';
+    for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        const alpha = Math.min(1, message.time/fadeTime);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = message.color;
+        const x = margin;
+        const y = height-(messages.length-i-1)*(fontSize+padding) - margin;
+        ctx.strokeText(message.text, margin, y);
+        ctx.fillText(message.text, margin, y);
+    }
+});
+
 player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50, inertia: {x: 0, y: 0}, friction: 0.9, battery: 1}, function() {
     const movementForce = 1;
     if (pressedKeys['left']) this.inertia.x -= movementForce;
@@ -111,78 +183,6 @@ function makeRingEffect(x, y, color) {
         return alpha > 0;
     });
 }
-
-// Update messages.
-updating.add(function() {
-    for (let i = messages.length-1; i >= 0; i--) {
-        const message = messages[i];
-        message.time -= 1;
-        if (message.time <= 0) {
-            messages.splice(i, 1);
-        }
-    }
-
-    if (t % 100 == 0) {
-        const color = Math.random() > 0.5 ? '#FF5555' : '#6666FF';
-        const text = 'Hey! ' + Math.ceil(Math.random() * 100);
-        messages.push({text: text, time: 310, color: color});
-    }
-});
-
-// Draw grid.
-rendering.add(function(ctx) {
-    ctx.fillStyle = 'black';
-    // Draw grid.
-    ctx.save();
-    ctx.fillRect(0, 0, world.width, world.height);
-    ctx.shadowColor = '#00FF00';
-    ctx.shadowBlur = 8;
-    ctx.strokeStyle = '#005500';
-    ctx.lineWidth = 1;
-    const startX = Math.floor((player.x-player.width /2) / gridSize) * gridSize;
-    const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
-    const endX =   Math.ceil ((player.x+player.width /2) / gridSize) * gridSize;
-    const endY =   Math.ceil ((player.y+player.height/2) / gridSize) * gridSize;
-    for (let x = 0; x <= world.width; x += gridSize) {
-        ctx.moveTo(x, 0);
-        if (x > startX && x < endX) {
-            ctx.lineTo(x, startY);
-            ctx.moveTo(x, endY);
-        }
-        ctx.lineTo(x, world.height);
-    }
-    for (let y = 0; y <= world.height; y += gridSize) {
-        ctx.moveTo(0, y);
-        if (y > startY && y < endY) {
-            ctx.lineTo(startX, y);
-            ctx.moveTo(endX, y);
-        }
-        ctx.lineTo(world.width, y);
-    }
-    ctx.stroke();
-    ctx.restore();
-});
-
-// Render messages.
-ui.add(function(ctx) {
-    const fontSize = 30;
-    const margin = 10;
-    const padding = 3;
-    const fadeTime = 120;
-    ctx.font = fontSize + 'px courier new';
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = 'black';
-    for (let i = 0; i < messages.length; i++) {
-        const message = messages[i];
-        const alpha = Math.min(1, message.time/fadeTime);
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = message.color;
-        const x = margin;
-        const y = height-(messages.length-i-1)*(fontSize+padding) - margin;
-        ctx.strokeText(message.text, margin, y);
-        ctx.fillText(message.text, margin, y);
-    }
-});
 
 (function() {
     const canvas = document.getElementById('canvas');
