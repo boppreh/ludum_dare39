@@ -17,6 +17,7 @@ If power runs out you:
 [ ] attract danger
 [ ] lose points
 [ ] explode and continue with other unit
+[ ] become a wall and continue with other unit
 
 To restore power you can:
 [ ] do nothing
@@ -26,6 +27,9 @@ To restore power you can:
 [ ] perform tricks
 [ ] take risks
 [ ] go to a special location
+[ ] shake the mouse
+[ ] shake the browser window
+[ ] mash the keyboard
 
 Power drain is visible by:
 [ ] general slowdown
@@ -59,6 +63,8 @@ Gameplay is:
 [ ] about collecting
 [ ] about searching
 [ ] about optmising
+[ ] about defending
+[ ] upgrade fest
 
 Story:
 [ ] lost robot
