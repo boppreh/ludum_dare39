@@ -11,75 +11,90 @@
         <script>
 "use strict";
 
-const TAU = 2 * Math.PI;
 const pressedKeys = {};
-const gridSize = 80;
-let width = canvas.width;
-let height = canvas.height;
-let quality = 1;
+let width = 1;
+let height = 1;
 let pixelation = 0;
 let frameBuildup = 1;
-let t = 0;
-let world = {width: 10000, height: 10000};
 let camera = {x: 0, y: 0, scale: 1};
-let battery = 1;
-let batteryDrain = 0.001;
+let t = 0;
+
+const TAU = 2 * Math.PI;
+const gridSize = 80;
+let world = {width: 10000, height: 10000};
 let player = null;
 const messages = [];
-const headRender = {prev: null, next: null, fn: function(ctx){}};
-let tailRender = headRender;
 
-function addEffect(fn) {
-    const node = {prev: tailRender, next: null, fn: fn};
-    tailRender.next = node;
-    tailRender = node;
-    return function() {
-        node.prev.next = node.next;
-        if (tailRender === node) {
-            tailRender = node;
+function makeChain() {
+    const head = {prev: null, next: null, fn: function(){}};
+    let tail = head;
+    return {
+        add: function(fn) {
+            const node = {prev: tail, next: null, fn: fn};
+            tail.next = node;
+            tail = node;
+            return function() {
+                node.prev.next = node.next;
+                if (tail === node) {
+                    tail = node;
+                }
+            };
+        },
+        fire: function(arg) {
+            let node = head;
+            while (node !== null) {
+                node.fn(arg);
+                node = node.next;
+            }
         }
-    };
+    }
 }
-function makeObject(obj, renderFn) {
-    obj.destroy = addEffect(renderFn.bind(obj));
+
+const rendering = makeChain();
+const updating = makeChain();
+const ui = makeChain();
+
+function makeObject(obj, updateFn, renderFn) {
+    const removeUpdate = updating.add(updateFn.bind(obj));
+    const removeEffect = rendering.add(renderFn.bind(obj));
+    obj.destroy = function() { removeUpdate(); removeEffect(); };
     return obj;
 }
 
-player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50, inertia: {x: 0, y: 0}, friction: 0.9}, function(ctx) {
+player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50, inertia: {x: 0, y: 0}, friction: 0.9, battery: 1}, function() {
+    const movementForce = 1;
+    if (pressedKeys['left']) this.inertia.x -= movementForce;
+    if (pressedKeys['right']) this.inertia.x += movementForce;
+    if (pressedKeys['up']) this.inertia.y -= movementForce;
+    if (pressedKeys['down']) this.inertia.y += movementForce;
+    this.x += this.inertia.x;
+    this.y += this.inertia.y;
+    this.inertia.x *= this.friction;
+    this.inertia.y *= this.friction;
 
+    camera.x = this.x;
+    camera.y = this.y;
+
+    let quality = Math.min(0.5, this.battery) * 2;
+    pixelation = 16 * (1-quality);
+    frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
+}, function(ctx) {
     // Draw base.
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.width/2, 0, 2 * Math.PI);
     ctx.strokeStyle = '#0000FF';
     ctx.shadowColor = '#0000FF';
     ctx.shadowBlur = 10;
     ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.width/2, 0, 2 * Math.PI);
     ctx.stroke();
     // Draw battery cell.
+    ctx.fillStyle = 'rgb(0, ' + Math.pow(this.battery, 1.8)*0xFF + ', 0)';
     ctx.beginPath();
-    ctx.fillStyle = 'rgb(0, ' + Math.pow(battery, 1.8)*0xFF + ', 0)';
     ctx.arc(this.x, this.y, 5, 0, 2 * Math.PI);
     ctx.fill();
     ctx.restore();
 });
-
-function updateDirectPlayerMovement() {
-    const movementForce = 1;
-    if (pressedKeys['left']) player.inertia.x -= movementForce;
-    if (pressedKeys['right']) player.inertia.x += movementForce;
-    if (pressedKeys['up']) player.inertia.y -= movementForce;
-    if (pressedKeys['down']) player.inertia.y += movementForce;
-    player.x += player.inertia.x;
-    player.y += player.inertia.y;
-    player.inertia.x *= player.friction;
-    player.inertia.y *= player.friction;
-
-    camera.x = player.x;
-    camera.y = player.y;
-}
-
-let movePlayer = updateDirectPlayerMovement;
 
 function makeRingEffect(x, y, color) {
     let startT = t;
@@ -97,24 +112,8 @@ function makeRingEffect(x, y, color) {
     });
 }
 
-function update() {
-    const qualityDropSpeed = 1/120;
-    quality = Math.min(0.5, battery) * 2;
-    pixelation = 16 * (1-quality);
-    frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
-    //battery = Math.max(battery-batteryDrain, 0);
-
-    if (battery === 0) {
-        makeRingEffect(player.x, player.y, '#0000FF');
-        battery = 1;
-    }
-
-    if (pressedKeys['space'] && t % 30 == 0) {
-        makeRingEffect(player.x, player.y, '#0000FF');
-    }
-
-    movePlayer();
-
+// Update messages.
+updating.add(function() {
     for (let i = messages.length-1; i >= 0; i--) {
         const message = messages[i];
         message.time -= 1;
@@ -128,9 +127,10 @@ function update() {
         const text = 'Hey! ' + Math.ceil(Math.random() * 100);
         messages.push({text: text, time: 310, color: color});
     }
-}
+});
 
-function renderWorld(ctx) {
+// Draw grid.
+rendering.add(function(ctx) {
     ctx.fillStyle = 'black';
     // Draw grid.
     ctx.save();
@@ -161,9 +161,10 @@ function renderWorld(ctx) {
     }
     ctx.stroke();
     ctx.restore();
-}
+});
 
-function renderUI(ctx) {
+// Render messages.
+ui.add(function(ctx) {
     const fontSize = 30;
     const margin = 10;
     const padding = 3;
@@ -181,7 +182,7 @@ function renderUI(ctx) {
         ctx.strokeText(message.text, margin, y);
         ctx.fillText(message.text, margin, y);
     }
-}
+});
 
 (function() {
     const canvas = document.getElementById('canvas');
@@ -207,10 +208,9 @@ function renderUI(ctx) {
     function updateFrame() {
         t++;
 
-        update();
+        updating.fire();
+
         frameReady += frameBuildup + 0.01;
-
-
         if (frameReady >= 1) {
             frameReady -= 1;
             scaling = 1 / (pixelation + 1);
@@ -222,19 +222,16 @@ function renderUI(ctx) {
             bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
             bufferCtx.scale(camera.scale, camera.scale);
             bufferCtx.translate(Math.round(-camera.x), Math.round(-camera.y));
-            renderWorld(bufferCtx);
-            let effectNode = headRender;
-            while (effectNode !== null) {
-                effectNode.fn(bufferCtx);
-                effectNode = effectNode.next;
-            }
+            rendering.fire(bufferCtx);
             bufferCtx.restore();
         }
 
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(buffer, 0, 0, width*scaling, height*scaling, 0, 0, width, height);
         ctx.save();
-        renderUI(ctx);
+
+        ui.fire(ctx);
+
         ctx.restore();
 
         window.requestAnimationFrame(updateFrame);
