@@ -12,16 +12,10 @@
         <script>
 "use strict";
 
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-ctx.mozImageSmoothingEnabled = false;
-ctx.webkitImageSmoothingEnabled = false;
-ctx.imageSmoothingEnabled = false;
-let frameReady = 0;
+const pressedKeys = {};
 let frameBuildup = 1;
 let width, height;
 let pixelation = 0;
-
 let t = 0;
 
 function update() {
@@ -34,7 +28,7 @@ function update() {
     frameBuildup = 1 - maxSkippedFrames * quality;
 }
 
-function render() {
+function render(ctx) {
     ctx.beginPath();
     ctx.arc(width/2+Math.cos(t/130)*100, height/2+Math.sin(t/130)*100, Math.min(width, height)/4, 0, 2 * Math.PI, false);
     ctx.fillStyle = 'green';
@@ -44,33 +38,75 @@ function render() {
     ctx.stroke();
 }
 
-function updateFrame() {
-    t++;
+function setup(update, render) {
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = false;
 
-    update();
-    frameReady += frameBuildup;
+    let frameReady = 0;
 
-    if (frameReady >= 1) {
-        frameReady -= 1;
+    function updateFrame() {
+        t++;
 
-        const scaling = 1 / pixelation;
-        width = canvas.width;
-        height = canvas.height;
+        update();
+        frameReady += frameBuildup;
 
-        ctx.save();
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.scale(scaling, scaling);
+        if (frameReady >= 1) {
+            frameReady -= 1;
 
-        render();
+            const scaling = 1 / pixelation;
+            width = canvas.width;
+            height = canvas.height;
 
-        ctx.restore();
-        ctx.drawImage(canvas, 0, 0, width*scaling, height*scaling, 0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.scale(scaling, scaling);
+
+            render(ctx);
+
+            ctx.restore();
+            ctx.drawImage(canvas, 0, 0, width*scaling, height*scaling, 0, 0, canvas.width, canvas.height);
+        }
+
+        window.requestAnimationFrame(updateFrame);
     }
-
     window.requestAnimationFrame(updateFrame);
+
+    const KEY_NAME_BY_KEYCODE = {
+        32: 'space', 37: 'left', 38: 'up', 39: 'right',
+        40: 'down', 27: 'esc', 13: 'enter',
+        17: 'ctrl', 9: 'alt'
+    };
+    function processKeyEvent(event, isDown) {
+        const keycode = event.which,
+            hasCtrl = event.ctrlKey,
+            isKnownSpecial = KEY_NAME_BY_KEYCODE[keycode],
+            isAlpha = keycode >= 48 && keycode <= 90;
+
+        pressedKeys[keycode] = isDown;
+        if (isKnownSpecial) {
+            pressedKeys[KEY_NAME_BY_KEYCODE[keycode]] = isDown;
+        }
+        if (isAlpha) {
+            pressedKeys[String.fromCharCode(keycode).toUpperCase()] = isDown;
+            pressedKeys[String.fromCharCode(keycode).toLowerCase()] = isDown;
+        }
+
+        if (!hasCtrl && (isKnownSpecial || isAlpha)) {
+            event.preventDefault();
+        }    
+    }
+    window.addEventListener('keydown', function(event) {
+        processKeyEvent(event, true);
+    });
+    window.addEventListener('keyup', function(event) {
+        processKeyEvent(event, true);
+    });
 }
-window.requestAnimationFrame(updateFrame);
+
+setup(update, render);
         </script>
     </body>
 </html>
