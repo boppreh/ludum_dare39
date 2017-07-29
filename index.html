@@ -13,7 +13,7 @@
 
 const TAU = 2 * Math.PI;
 const pressedKeys = {};
-const gridSize = 50;
+const gridSize = 80;
 let width = canvas.width;
 let height = canvas.height;
 let quality = 1;
@@ -24,34 +24,11 @@ let world = {width: 10000, height: 10000};
 let camera = {x: 0, y: 0, scale: 1};
 let battery = 1;
 let batteryDrain = 0.001;
-let player = {x: world.width/2, y: world.height/2, width: gridSize, height: gridSize, inertia: {x: 0, y: 0}, friction: 0.9};
+let player = {x: world.width/2, y: world.height/2, width: 50, height: 50, inertia: {x: 0, y: 0}, friction: 0.9};
 const messages = [];
 const effects = [];
 
-function update() {
-    const qualityDropSpeed = 1/120;
-    quality = Math.min(0.5, battery) * 2;
-    pixelation = 16 * (1-quality);
-    frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
-    battery = Math.max(battery-batteryDrain, 0);
-
-    if (battery === 0) {
-        let startT = t;
-        effects.push(function(ctx) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.strokeStyle = '#0000FF'
-            ctx.lineWidth = 10;
-            ctx.arc(player.x, player.y, player.width/2 + 5*(t-startT), 0, TAU);
-            let alpha = Math.max(0, 1 - (t-startT)/30)
-            ctx.globalAlpha = alpha;
-            ctx.stroke();
-            ctx.restore();
-            return alpha > 0;
-        });
-        battery = 1;
-    }
-
+function updateDirectPlayerMovement() {
     const movementForce = 1;
     if (pressedKeys['left']) player.inertia.x -= movementForce;
     if (pressedKeys['right']) player.inertia.x += movementForce;
@@ -64,6 +41,43 @@ function update() {
 
     camera.x = player.x;
     camera.y = player.y;
+}
+
+let movePlayer = updateDirectPlayerMovement;
+
+function makeRingEffect(x, y, color) {
+    let startT = t;
+    effects.push(function(ctx) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = color
+        ctx.lineWidth = 10;
+        ctx.arc(x, y, 100*Math.log(t-startT), 0, TAU);
+        let alpha = Math.max(0, 1 - (t-startT)/30)
+        ctx.globalAlpha = alpha;
+        ctx.stroke();
+        ctx.restore();
+        return alpha > 0;
+    });
+}
+
+function update() {
+    const qualityDropSpeed = 1/120;
+    quality = Math.min(0.5, battery) * 2;
+    pixelation = 16 * (1-quality);
+    frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
+    //battery = Math.max(battery-batteryDrain, 0);
+
+    if (battery === 0) {
+        makeRingEffect(player.x, player.y, '#0000FF');
+        battery = 1;
+    }
+
+    if (pressedKeys['space'] && t % 30 == 0) {
+        makeRingEffect(player.x, player.y, '#0000FF');
+    }
+
+    movePlayer();
 
     for (let i = messages.length-1; i >= 0; i--) {
         const message = messages[i];
@@ -74,45 +88,53 @@ function update() {
     }
 
     if (t % 100 == 0) {
-        const color = Math.random() > 0.5 ? '#FF5555' : '#7777FF';
+        const color = Math.random() > 0.5 ? '#FF5555' : '#6666FF';
         const text = 'Hey! ' + Math.ceil(Math.random() * 100);
         messages.push({text: text, time: 310, color: color});
     }
 }
 
 function renderWorld(ctx) {
+    ctx.fillStyle = 'black';
     // Draw grid.
     ctx.save();
-    ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, world.width, world.height);
-    ctx.globalAlpha = 0.2;
-    ctx.strokeStyle = '#00FF00';
+    ctx.shadowColor = '#00FF00';
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#005500';
     ctx.lineWidth = 1;
+    const startX = Math.floor((player.x-player.width /2) / gridSize) * gridSize;
+    const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
+    const endX =   Math.ceil ((player.x+player.width /2) / gridSize) * gridSize;
+    const endY =   Math.ceil ((player.y+player.height/2) / gridSize) * gridSize;
     for (let x = 0; x <= world.width; x += gridSize) {
         ctx.moveTo(x, 0);
+        if (x > startX && x < endX) {
+            ctx.lineTo(x, startY);
+            ctx.moveTo(x, endY);
+        }
         ctx.lineTo(x, world.height);
     }
     for (let y = 0; y <= world.height; y += gridSize) {
         ctx.moveTo(0, y);
+        if (y > startY && y < endY) {
+            ctx.lineTo(startX, y);
+            ctx.moveTo(endX, y);
+        }
         ctx.lineTo(world.width, y);
     }
     ctx.stroke();
-    // Clear grid around player.
-    ctx.globalAlpha = 1;
-    const startX = Math.floor((player.x-player.width/2) / gridSize) * gridSize;
-    const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
-    const width = Math.ceil((player.x+player.width/2) / gridSize) * gridSize - startX;
-    const height = Math.ceil((player.y+player.height/2) / gridSize) * gridSize - startY;
-    ctx.fillRect(startX, startY, width, height);
     ctx.restore();
 
     // Draw player base.
     ctx.save();
-    ctx.lineWidth = 10;
     ctx.beginPath();
     ctx.arc(player.x, player.y, player.width/2, 0, 2 * Math.PI);
-    ctx.fillStyle = '#0000FF';
-    ctx.fill();
+    ctx.strokeStyle = '#0000FF';
+    ctx.shadowColor = '#0000FF';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 6;
+    ctx.stroke();
     // Draw player battery cell.
     ctx.beginPath();
     ctx.fillStyle = 'rgb(0, ' + Math.pow(battery, 1.8)*0xFF + ', 0)';
