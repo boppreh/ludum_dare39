@@ -66,33 +66,37 @@ function makeObject(obj, updateFn, renderFn) {
 // Draw grid.
 rendering.add(function(ctx) {
     ctx.fillStyle = 'black';
-    // Draw grid.
+    // Cell center is inside rectangle, not corners.
     ctx.fillRect(0, 0, world.width, world.height);
-    const startX = Math.floor((player.x-player.width /2) / gridSize) * gridSize;
-    const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
-    const endX =   Math.ceil ((player.x+player.width /2) / gridSize) * gridSize;
-    const endY =   Math.ceil ((player.y+player.height/2) / gridSize) * gridSize;
+    ctx.scale(gridSize, gridSize);
+    ctx.translate(0.5, 0.5);
+    
+    const startCellX = Math.floor((player.x-player.width /2-gridSize/2) / gridSize);
+    const startCellY = Math.floor((player.y-player.height/2-gridSize/2) / gridSize);
+    const endCellX =   Math.ceil ((player.x+player.width /2-gridSize/2) / gridSize);
+    const endCellY =   Math.ceil ((player.y+player.height/2-gridSize/2) / gridSize);
     ctx.fillStyle = '#000022';
-    ctx.fillRect(startX, startY, endX - startX, endY - startY);
+    ctx.fillRect(startCellX, startCellY, endCellX - startCellX, endCellY - startCellY);
+
     ctx.shadowColor = '#00FF00';
     ctx.shadowBlur = 8;
     ctx.strokeStyle = '#005500';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= world.width; x += gridSize) {
+    ctx.lineWidth = 1/gridSize;
+    for (let x = 0; x <= world.width/gridSize; x++) {
         ctx.moveTo(x, 0);
-        if (x > startX && x < endX) {
-            ctx.lineTo(x, startY);
-            ctx.moveTo(x, endY);
+        if (x > startCellX && x < endCellX) {
+            ctx.lineTo(x, startCellY);
+            ctx.moveTo(x, endCellY);
         }
-        ctx.lineTo(x, world.height);
+        ctx.lineTo(x, world.height/gridSize);
     }
-    for (let y = 0; y <= world.height; y += gridSize) {
+    for (let y = 0; y <= world.height/gridSize; y++) {
         ctx.moveTo(0, y);
-        if (y > startY && y < endY) {
-            ctx.lineTo(startX, y);
-            ctx.moveTo(endX, y);
+        if (y > startCellY && y < endCellY) {
+            ctx.lineTo(startCellX, y);
+            ctx.moveTo(endCellX, y);
         }
-        ctx.lineTo(world.width, y);
+        ctx.lineTo(world.width/gridSize, y);
     }
     ctx.stroke();
 });
