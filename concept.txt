@@ -9,3 +9,10 @@ Achievements/unlockables:
 Inventing the wheel: extra speed, car-like controls and automatic orientation.
 Teriyaki Boyz: even more speed, vehicle now drifts.
 Smooth 'til the end: low power doesn't drop FPS anymore, but still pixelates.
+
+
+"Congratulations, Columbus. You found the edge of the world"
+"Blue, your drone is broken." "It's doing its best."
+"Did it just explode? LOL" "I'm sure it meant to do that." "Unlocked: press SPACE to self-destruct"
+
+Cyberpunk-terminal / radar aesthethic. Black background, unimportant stuff is green, everything has a ton of glow, very saturated colors, solid colors with little texture.
