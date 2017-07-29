@@ -1,1 +1,11 @@
-Top-down shooter-like. Base is under attack. Player controls a unit produced by the base/factory with respawn. Movement depletes energy (low FPS, pixelated, corner shadows, quieter sound). Only attack available is self-destruct. Explosion power is proportional to remaining power (so if attackers get too close the explosions are automatically more useful). Depleted or abandoned units that didn't self-destruct become (destructible) walls to hinder movement. Buyable upgrades. Different enemy types. Waves. Explosions push objects. Colored circles versus other geometrical shapes. Absorb energy from abandoned units. Goal is to destroy enemy base. Screen immitates a radar screen. Upgrades are achievement-based ("you ran past 10 enemies without touching them, +30% movement speed", "destroyed 5 enemies in one explosion, +10% explosion radius").
+Top-down shooter-like. Base is under attack. Player controls a unit produced by the base/factory with respawn. Movement depletes energy (low FPS, pixelated, corner shadows, quieter sound). Only attack available is self-destruct. Explosion power is proportional to remaining power (so if attackers get too close the explosions are automatically more useful). Depleted or abandoned units that didn't self-destruct become (destructible) walls to hinder movement. Buyable upgrades. Different enemy types. Waves. Explosions push objects. Colored circles versus other geometrical shapes. Absorb energy from abandoned units. Goal is to destroy enemy base. Screen immitates a radar screen. Upgrades are achievement-based ("you ran past 10 enemies without touching them, +30% movement speed", "destroyed 5 enemies in one explosion, +10% explosion radius"). "Living" entities glow. Enemy entities move along tiles (use Djsktra for path-finding).
+
+Communication via WoW-like chat, including achievements. Banter between bases. Personalities similar to that future football game.
+
+Game start: black screen. Red flash. Red flash. Unit is produced, screen clears and show what is happening: the base is under attack! Unlocked: "desperate measures: press 'space' to self-destruct".
+
+Achievements/unlockables:
+
+Inventing the wheel: extra speed, car-like controls and automatic orientation.
+Teriyaki Boyz: even more speed, vehicle now drifts.
+Smooth 'til the end: low power doesn't drop FPS anymore, but still pixelates.
