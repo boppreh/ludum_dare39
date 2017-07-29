@@ -28,7 +28,8 @@ To restore power you can:
 [ ] go to a special location
 
 Power drain is visible by:
-[ ] action results (slower, less damage)
+[ ] general slowdown
+[ ] action results (slower movement, deals less damage)
 [ ] bar
 [ ] countdown
 [ ] flashing
@@ -44,8 +45,24 @@ Gameplay is:
 [ ] shooter
 [ ] puzzle
 [ ] top-down
-[ ] sideways platformer
+[ ] sideways
 [ ] shoot-em-up
+[ ] always moving
 [ ] text-based
 [ ] RPG
 [ ] arcade
+[ ] point-and-click
+[ ] keyboard based
+[ ] mouse based
+[ ] about dodging
+[ ] about attacking
+[ ] about collecting
+[ ] about searching
+[ ] about optmising
+
+Story:
+[ ] lost robot
+[ ] flashlight-dying explorer
+[ ] mana-limited mage
+[ ] hungry survivor
+[ ] stranded alien
