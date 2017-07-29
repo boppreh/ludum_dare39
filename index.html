@@ -6,8 +6,7 @@
     </head>
 
     <body style='background: black;'>
-        <canvas id='canvas' width=800 height=600 style='display: block;
-        background: #111; margin-left: auto; margin-right: auto; image-rendering: optimizeSpeed; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: -o-crisp-edges; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;'></canvas>
+        <canvas id='canvas' width=800 height=600 style='display: block; margin-left: auto; margin-right: auto;'></canvas>
 
         <script>
 "use strict";
@@ -25,10 +24,10 @@ let camera = {x: 0, y: 0, scale: 1};
 let battery = 1;
 let batteryDrain = 0.001;
 let player = {x: world.width/2, y: world.height/2, inertia: {x: 0, y: 0}, friction: 0.9};
+const messages = [];
 
 function update() {
     const qualityDropSpeed = 1/120;
-    //quality = Math.abs(Math.sin(t*qualityDropSpeed));
     quality = Math.min(0.5, battery) * 2;
     pixelation = 16 * (1-quality);
     frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
@@ -46,6 +45,20 @@ function update() {
 
     camera.x = -player.x + width/2;
     camera.y = -player.y + height/2;
+
+    for (let i = messages.length-1; i >= 0; i--) {
+        const message = messages[i];
+        message.time -= 1;
+        if (message.time <= 0) {
+            messages.splice(i, 1);
+        }
+    }
+
+    if (t % 100 == 0) {
+        const color = Math.random() > 0.5 ? '#FF5555' : '#7777FF';
+        const text = 'Hey! ' + Math.ceil(Math.random() * 100);
+        messages.push({text: text, time: 310, color: color});
+    }
 }
 
 function renderWorld(ctx) {
@@ -86,16 +99,45 @@ function renderWorld(ctx) {
 }
 
 function renderUI(ctx) {
-
+    const fontSize = 30;
+    const margin = 10;
+    const padding = 3;
+    const fadeTime = 120;
+    ctx.font = fontSize + 'px courier new';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'black';
+    for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+        const alpha = Math.min(1, message.time/fadeTime);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = message.color;
+        const x = margin;
+        const y = height-(messages.length-i-1)*(fontSize+padding) - margin;
+        ctx.strokeText(message.text, margin, y);
+        ctx.fillText(message.text, margin, y);
+    }
 }
 
 (function() {
     const canvas = document.getElementById('canvas');
+    canvas.style = 'margin: auto; display: block; image-rendering: optimizeSpeed; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: -o-crisp-edges; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;'
     const ctx = canvas.getContext('2d');
     ctx.webkitImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
 
+    width = canvas.width;
+    height = canvas.height;
+
+    const buffer = document.createElement("canvas");
+    buffer.style = 'image-rendering: optimizeSpeed; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: -o-crisp-edges; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;'
+    buffer.width = width;
+    buffer.height = height;
+    const bufferCtx = buffer.getContext('2d');
+    bufferCtx.webkitImageSmoothingEnabled = false;
+    bufferCtx.imageSmoothingEnabled = false;
+
     let frameReady = 0;
+    let scaling = 1;
 
     function updateFrame() {
         t++;
@@ -103,29 +145,26 @@ function renderUI(ctx) {
         update();
         frameReady += frameBuildup + 0.01;
 
+
         if (frameReady >= 1) {
             frameReady -= 1;
+            scaling = 1 / (pixelation + 1);
 
-            const scaling = 1 / (pixelation + 1);
-            width = canvas.width;
-            height = canvas.height;
-
-            ctx.save();
-            ctx.fillStyle = '#111';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.scale(scaling, scaling);
-
-            ctx.scale(camera.scale, camera.scale);
-            ctx.translate(camera.x, camera.y);
-            renderWorld(ctx);
-
-            ctx.restore();
-            ctx.drawImage(canvas, 0, 0, width*scaling, height*scaling, 0, 0, canvas.width, canvas.height);
-
-            ctx.save();
-            renderUI(ctx);
-            ctx.restore();
+            bufferCtx.save();
+            bufferCtx.fillStyle = '#111';
+            bufferCtx.fillRect(0, 0, width, height);
+            bufferCtx.scale(scaling, scaling);
+            bufferCtx.scale(camera.scale, camera.scale);
+            bufferCtx.translate(camera.x, camera.y);
+            renderWorld(bufferCtx);
+            bufferCtx.restore();
         }
+
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(buffer, 0, 0, width*scaling, height*scaling, 0, 0, width, height);
+        ctx.save();
+        renderUI(ctx);
+        ctx.restore();
 
         window.requestAnimationFrame(updateFrame);
     }
