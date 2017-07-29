@@ -40,10 +40,12 @@ function makeChain() {
                 }
             };
         },
-        fire: function(arg) {
+        fire: function(arg, before, after) {
             let node = head;
             while (node !== null) {
+                if (before) before();
                 node.fn(arg);
+                if (after) after();
                 node = node.next;
             }
         }
@@ -65,7 +67,6 @@ function makeObject(obj, updateFn, renderFn) {
 rendering.add(function(ctx) {
     ctx.fillStyle = 'black';
     // Draw grid.
-    ctx.save();
     ctx.fillRect(0, 0, world.width, world.height);
     const startX = Math.floor((player.x-player.width /2) / gridSize) * gridSize;
     const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
@@ -94,7 +95,6 @@ rendering.add(function(ctx) {
         ctx.lineTo(world.width, y);
     }
     ctx.stroke();
-    ctx.restore();
 });
 
 // Update messages.
@@ -155,7 +155,6 @@ player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50,
     frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
 }, function(ctx) {
     // Draw base.
-    ctx.save();
     ctx.translate(this.x, this.y);
     ctx.strokeStyle = '#0000FF';
     ctx.shadowColor = '#0000FF';
@@ -169,7 +168,6 @@ player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50,
     ctx.beginPath();
     ctx.arc(0, 0, 5, 0, 2 * Math.PI);
     ctx.fill();
-    ctx.restore();
 });
 
 let drone = makeObject({x: world.width/2, y: world.height/2}, function() {
@@ -186,7 +184,6 @@ let drone = makeObject({x: world.width/2, y: world.height/2}, function() {
     if (this.target.y > this.y) this.y += 1;
     if (this.target.y < this.y) this.y -= 1;
 }, function(ctx) {
-    ctx.save();
     ctx.strokeStyle = '#FF0000';
     ctx.shadowColor = '#FF0000';
     ctx.shadowBlur = 10;
@@ -200,13 +197,11 @@ let drone = makeObject({x: world.width/2, y: world.height/2}, function() {
     ctx.lineTo(+20, -20);
     ctx.closePath();
     ctx.stroke();
-    ctx.restore();
 });
 
 function makeRingEffect(x, y, color) {
     let startT = t;
     effects.push(function(ctx) {
-        ctx.save();
         ctx.beginPath();
         ctx.strokeStyle = color
         ctx.lineWidth = 10;
@@ -214,7 +209,6 @@ function makeRingEffect(x, y, color) {
         let alpha = Math.max(0, 1 - (t-startT)/30)
         ctx.globalAlpha = alpha;
         ctx.stroke();
-        ctx.restore();
         return alpha > 0;
     });
 }
@@ -260,7 +254,7 @@ function makeRingEffect(x, y, color) {
             bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
             bufferCtx.scale(camera.scale, camera.scale);
             bufferCtx.translate(Math.round(-camera.x), Math.round(-camera.y));
-            rendering.fire(bufferCtx);
+            rendering.fire(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
             bufferCtx.restore();
         }
 
@@ -268,7 +262,7 @@ function makeRingEffect(x, y, color) {
         ctx.drawImage(buffer, 0, 0, width*scaling, height*scaling, 0, 0, width, height);
         ctx.save();
 
-        ui.fire(ctx);
+        ui.fire(ctx, ctx.save.bind(ctx), ctx.restore.bind(ctx));
 
         ctx.restore();
 
