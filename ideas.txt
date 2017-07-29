@@ -65,6 +65,7 @@ Gameplay is:
 [ ] about optmising
 [ ] about defending
 [ ] upgrade fest
+[ ] endless
 
 Story:
 [ ] lost robot
