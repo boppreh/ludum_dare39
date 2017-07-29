@@ -23,7 +23,7 @@ let world = {width: 10000, height: 10000};
 let camera = {x: 0, y: 0, scale: 1};
 let battery = 1;
 let batteryDrain = 0.001;
-let player = {x: world.width/2, y: world.height/2, inertia: {x: 0, y: 0}, friction: 0.9};
+let player = {x: world.width/2, y: world.height/2, width: gridSize, height: gridSize, inertia: {x: 0, y: 0}, friction: 0.9};
 const messages = [];
 
 function update() {
@@ -62,7 +62,11 @@ function update() {
 }
 
 function renderWorld(ctx) {
+    // Draw grid.
     ctx.save();
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, world.width, world.height);
+    ctx.globalAlpha = 0.2;
     ctx.strokeStyle = '#00FF00';
     ctx.lineWidth = 1;
     for (let x = 0; x <= world.width; x += gridSize) {
@@ -74,13 +78,21 @@ function renderWorld(ctx) {
         ctx.lineTo(world.width, y);
     }
     ctx.stroke();
+    // Clear grid around player.
+    ctx.globalAlpha = 1;
+    const startX = Math.floor((player.x-player.width/2) / gridSize) * gridSize;
+    const startY = Math.floor((player.y-player.height/2) / gridSize) * gridSize;
+    const width = Math.ceil((player.x+player.width/2) / gridSize) * gridSize - startX;
+    const height = Math.ceil((player.y+player.height/2) / gridSize) * gridSize - startY;
+    ctx.fillRect(startX, startY, width, height);
     ctx.restore();
 
+    // Draw player base.
+    ctx.save();
     ctx.lineWidth = 10;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
     ctx.shadowBlur = 10;
-
     ctx.beginPath();
     ctx.arc(player.x, player.y, 15, 0, 2 * Math.PI, false);
     ctx.fillStyle = '#0000FF';
@@ -88,8 +100,7 @@ function renderWorld(ctx) {
     ctx.fill();
     ctx.strokeStyle = '#000066';
     ctx.stroke();
-
-    ctx.save();
+    // Draw player battery cell.
     ctx.shadowColor = '#00FF00';
     ctx.beginPath();
     ctx.fillStyle = 'rgb(0, ' + Math.pow(battery, 1.8)*0xFF + ', 0)';
