@@ -166,7 +166,7 @@ function renderUI(ctx) {
             bufferCtx.fillRect(0, 0, width, height);
             bufferCtx.scale(scaling, scaling);
             bufferCtx.scale(camera.scale, camera.scale);
-            bufferCtx.translate(camera.x, camera.y);
+            bufferCtx.translate(Math.round(camera.x), Math.round(camera.y));
             renderWorld(bufferCtx);
             bufferCtx.restore();
         }
