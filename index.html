@@ -43,8 +43,8 @@ function update() {
     player.inertia.x *= player.friction;
     player.inertia.y *= player.friction;
 
-    camera.x = -player.x + width/2;
-    camera.y = -player.y + height/2;
+    camera.x = player.x;
+    camera.y = player.y;
 
     for (let i = messages.length-1; i >= 0; i--) {
         const message = messages[i];
@@ -158,8 +158,9 @@ function renderUI(ctx) {
             bufferCtx.fillStyle = '#111';
             bufferCtx.fillRect(0, 0, width, height);
             bufferCtx.scale(scaling, scaling);
+            bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
             bufferCtx.scale(camera.scale, camera.scale);
-            bufferCtx.translate(Math.round(camera.x), Math.round(camera.y));
+            bufferCtx.translate(Math.round(-camera.x), Math.round(-camera.y));
             renderWorld(bufferCtx);
             bufferCtx.restore();
         }
