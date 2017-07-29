@@ -11,6 +11,7 @@
         <script>
 "use strict";
 
+const TAU = 2 * Math.PI;
 const pressedKeys = {};
 const gridSize = 50;
 let width = canvas.width;
@@ -25,13 +26,31 @@ let battery = 1;
 let batteryDrain = 0.001;
 let player = {x: world.width/2, y: world.height/2, width: gridSize, height: gridSize, inertia: {x: 0, y: 0}, friction: 0.9};
 const messages = [];
+const effects = [];
 
 function update() {
     const qualityDropSpeed = 1/120;
     quality = Math.min(0.5, battery) * 2;
     pixelation = 16 * (1-quality);
     frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
-    battery = Math.max(battery-batteryDrain, 0) || 1;
+    battery = Math.max(battery-batteryDrain, 0);
+
+    if (battery === 0) {
+        let startT = t;
+        effects.push(function(ctx) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = '#0000FF'
+            ctx.lineWidth = 10;
+            ctx.arc(player.x, player.y, player.width/2 + 5*(t-startT), 0, TAU);
+            let alpha = Math.max(0, 1 - (t-startT)/30)
+            ctx.globalAlpha = alpha;
+            ctx.stroke();
+            ctx.restore();
+            return alpha > 0;
+        });
+        battery = 1;
+    }
 
     const movementForce = 1;
     if (pressedKeys['left']) player.inertia.x -= movementForce;
@@ -91,13 +110,13 @@ function renderWorld(ctx) {
     ctx.save();
     ctx.lineWidth = 10;
     ctx.beginPath();
-    ctx.arc(player.x, player.y, player.width/2, 0, 2 * Math.PI, false);
+    ctx.arc(player.x, player.y, player.width/2, 0, 2 * Math.PI);
     ctx.fillStyle = '#0000FF';
     ctx.fill();
     // Draw player battery cell.
     ctx.beginPath();
     ctx.fillStyle = 'rgb(0, ' + Math.pow(battery, 1.8)*0xFF + ', 0)';
-    ctx.arc(player.x, player.y, 5, 0, 2 * Math.PI, false);
+    ctx.arc(player.x, player.y, 5, 0, 2 * Math.PI);
     ctx.fill();
     ctx.restore();
 }
@@ -162,6 +181,11 @@ function renderUI(ctx) {
             bufferCtx.scale(camera.scale, camera.scale);
             bufferCtx.translate(Math.round(-camera.x), Math.round(-camera.y));
             renderWorld(bufferCtx);
+            for (let i = effects.length - 1; i >= 0; i--) {
+                if (!effects[i](bufferCtx)) {
+                    effects.splice(i, 1);
+                }
+            }
             bufferCtx.restore();
         }
 
