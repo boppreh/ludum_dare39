@@ -21,20 +21,19 @@ function makeChain() {
             const node = {prev: tail, next: null, fn: fn};
             tail.next = node;
             tail = node;
-            node.remove = function() {
+            return function() {
                 node.prev.next = node.next;
                 if (node.next) node.next.prev = node.prev;
                 if (tail === node) {
                     tail = node.prev;
                 }
             };
-            return node.remove;
         },
         fire: function(arg, before, after) {
             let node = head;
             while (node !== null) {
                 if (before) before();
-                node.fn(arg, node);
+                node.fn(arg);
                 if (after) after();
                 node = node.next;
             }
@@ -49,15 +48,16 @@ function lerp(obj, props, duration, onFinish) {
         start[key] = obj[key];
     }
     const startT = game.t;
-    return game.updating.add(function(_, node) {
+    const stop = game.updating.add(function() {
         for (let key in props) {
             obj[key] = start[key] + (game.t - startT) * (props[key] - start[key]) / duration;
         }
         if (game.t - startT >= duration) {
-            node.remove();
+            stop();
             onFinish && onFinish();
         }
     });
+    return stop;
 }
 
 function absTrig(angle, cos, sin) {
@@ -166,6 +166,17 @@ function Game(canvasId) {
         processKeyEvent(event, false);
     });
 
+    game.add = function(obj, updateFn, renderFn) {
+        obj.updating = makeChain();
+        obj.rendering = makeChain();
+        obj.destroy = makeChain();
+        obj.destroy.add(game.updating.add(obj.updating.fire));
+        obj.destroy.add(game.rendering.add(obj.rendering.fire));
+        if (updateFn) obj.updating.add(updateFn.bind(obj));
+        if (renderFn) obj.rendering.add(renderFn.bind(obj));
+        return obj;
+    }
+
     return game;
 }
 
@@ -180,13 +191,6 @@ let exclusionZones;
 game.updating.add(function() {
     exclusionZones = [];
 })
-
-function makeObject(obj, updateFn, renderFn) {
-    const removeUpdate = game.updating.add(updateFn.bind(obj));
-    const removeEffect = game.rendering.add(renderFn.bind(obj));
-    obj.destroy = function() { removeUpdate(); removeEffect(); };
-    return obj;
-}
 
 function addExclusionZone(obj, color) {
     exclusionZones.unshift({
@@ -330,7 +334,7 @@ function updateDriftMovement() {
 }
 
 function spawnPlayer(x, y) {
-    return makeObject({
+    const obj = game.add({
         x: 0,
         y: 0,
         width: 50,
@@ -344,13 +348,17 @@ function spawnPlayer(x, y) {
         batteryOffset: 0,
         movementForce: 0.8,
         turnSpeed: 0.04,
-        updateDynamic: function() {},
         dead: false,
         alpha: 1,
         age: 0,
     }, function() {
         this.age++;
-        this.updateDynamic();
+
+        this.inertia.x *= (1 - this.friction);
+        this.inertia.y *= (1 - this.friction);
+        this.inertia.speed *= (1 - this.friction);
+        this.inertia.rotation *= (1 - this.rotationFriction);
+        this.rotation = (this.rotation + TAU) % TAU;
 
         addExclusionZone({
             x: this.x,
@@ -383,19 +391,14 @@ function spawnPlayer(x, y) {
             ctx.fill();
         }
     });
+
+    obj.die = makeChain();
+    obj.die.add(function() { obj.dead = true; });
+    return obj;
 }
 
-function playerUpdateDynamic() {
-    player.updateMovement();
-    if (game.pressedKeys['space'] && player.age > 60) suicide();
-
-    player.inertia.x *= (1 - player.friction);
-    player.inertia.y *= (1 - player.friction);
-    player.inertia.speed *= (1 - player.friction);
-    player.inertia.rotation *= (1 - player.rotationFriction);
-
-    player.rotation = (player.rotation + TAU) % TAU;
-
+const controlChain = makeChain();
+controlChain.add(function() {
     game.camera.x = player.x + player.inertia.x * 2;
     game.camera.y = player.y + player.inertia.y * 2;
 
@@ -403,22 +406,25 @@ function playerUpdateDynamic() {
     let quality = Math.min(0.5, player.battery) * 2;
     game.camera.pixelation = 16 * (1-quality);
     game.camera.renderingsPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
-}
-function suicide() {
-    player.updateDynamic = function() {};
-    player.dead = true;
+});
+controlChain.add(updateDirectMovement);
+controlChain.add(function() {
+    if (game.pressedKeys['space'] && player.age > 60) {
+        player.die();
+        createPlayer();
+    }
+});
 
+function createPlayer() {
     player = spawnPlayer(0, 0);
-    player.updateMovement = updateDirectMovement;
-    player.updateDynamic = playerUpdateDynamic;
+    player.die.add(player.updating.add(controlChain.fire));
     lerp(game.camera, {x: player.x, y: player.y}, 30);
 }
 
-player = spawnPlayer(0, 0);
-player.updateMovement = updateDirectMovement;
-player.updateDynamic = playerUpdateDynamic;
+createPlayer();
 
-let drone = makeObject({x: 0, y: 0, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
+/*
+let drone = addObject({x: 0, y: 0, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
     ctx.strokeStyle = '#FF0000';
     ctx.shadowColor = '#FF0000';
     ctx.shadowBlur = DEFAULT_SHADOW_BLUR;
@@ -460,6 +466,7 @@ function makeRingEffect(x, y, color) {
         return alpha > 0;
     });
 }
+*/
         </script>
     </body>
 </html>
