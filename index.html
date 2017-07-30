@@ -16,14 +16,8 @@ let width = 1;
 let height = 1;
 let pixelation = 0;
 let frameBuildup = 1;
-let camera = {x: 0, y: 0, scale: 1};
+let camera = {x: 0, y: 0, scale: 1, rotation: 0};
 let t = 0;
-
-const TAU = 2 * Math.PI;
-const gridSize = 80;
-let world = {width: 10000, height: 10000};
-let player = null;
-const messages = [];
 
 function makeChain() {
     const head = {prev: null, next: null, fn: function(){}};
@@ -56,11 +50,31 @@ const rendering = makeChain();
 const updating = makeChain();
 const ui = makeChain();
 
+const TAU = 2 * Math.PI;
+const gridSize = 80;
+let world = {width: 10000, height: 10000};
+let player = null;
+const messages = [];
+let exclusionZones;
+updating.add(function() {
+    exclusionZones = [];
+})
+
 function makeObject(obj, updateFn, renderFn) {
     const removeUpdate = updating.add(updateFn.bind(obj));
     const removeEffect = rendering.add(renderFn.bind(obj));
     obj.destroy = function() { removeUpdate(); removeEffect(); };
     return obj;
+}
+
+function addExclusionZone(obj, color) {
+    exclusionZones.unshift({
+        startCellX: Math.floor((obj.x-obj.width /2-gridSize/2) / gridSize),
+        startCellY: Math.floor((obj.y-obj.height/2-gridSize/2) / gridSize),
+        endCellX:   Math.ceil ((obj.x+obj.width /2-gridSize/2) / gridSize),
+        endCellY:   Math.ceil ((obj.y+obj.height/2-gridSize/2) / gridSize),
+        color: color,
+    });
 }
 
 // Draw grid.
@@ -70,13 +84,11 @@ rendering.add(function(ctx) {
     ctx.fillRect(0, 0, world.width, world.height);
     ctx.scale(gridSize, gridSize);
     ctx.translate(0.5, 0.5);
-    
-    const startCellX = Math.floor((player.x-player.width /2-gridSize/2) / gridSize);
-    const startCellY = Math.floor((player.y-player.height/2-gridSize/2) / gridSize);
-    const endCellX =   Math.ceil ((player.x+player.width /2-gridSize/2) / gridSize);
-    const endCellY =   Math.ceil ((player.y+player.height/2-gridSize/2) / gridSize);
-    ctx.fillStyle = '#000022';
-    ctx.fillRect(startCellX, startCellY, endCellX - startCellX, endCellY - startCellY);
+
+    for (const zone of exclusionZones) {
+        ctx.fillStyle = zone.color;
+        ctx.fillRect(zone.startCellX, zone.startCellY, zone.endCellX - zone.startCellX, zone.endCellY - zone.startCellY);
+    }
 
     ctx.shadowColor = '#00FF00';
     ctx.shadowBlur = 8;
@@ -84,17 +96,21 @@ rendering.add(function(ctx) {
     ctx.lineWidth = 1/gridSize;
     for (let x = 0; x <= world.width/gridSize; x++) {
         ctx.moveTo(x, 0);
-        if (x > startCellX && x < endCellX) {
-            ctx.lineTo(x, startCellY);
-            ctx.moveTo(x, endCellY);
+        for (const zone of exclusionZones) {
+            if (x > zone.startCellX && x < zone.endCellX) {
+                //ctx.lineTo(x, zone.startCellY);
+                //ctx.moveTo(x, zone.endCellY);
+            }
         }
         ctx.lineTo(x, world.height/gridSize);
     }
     for (let y = 0; y <= world.height/gridSize; y++) {
         ctx.moveTo(0, y);
-        if (y > startCellY && y < endCellY) {
-            ctx.lineTo(startCellX, y);
-            ctx.moveTo(endCellX, y);
+        for (const zone of exclusionZones) {
+            if (y > zone.startCellY && y < zone.endCellY) {
+                //ctx.lineTo(zone.startCellX, y);
+                //ctx.moveTo(zone.endCellX, y);
+            }
         }
         ctx.lineTo(world.width/gridSize, y);
     }
@@ -140,16 +156,83 @@ ui.add(function(ctx) {
     }
 });
 
-player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50, inertia: {x: 0, y: 0}, friction: 0.9, battery: 1}, function() {
-    const movementForce = 1;
-    if (pressedKeys['left']) this.inertia.x -= movementForce;
-    if (pressedKeys['right']) this.inertia.x += movementForce;
-    if (pressedKeys['up']) this.inertia.y -= movementForce;
-    if (pressedKeys['down']) this.inertia.y += movementForce;
+function renderPlayer(ctx) {
+    // Draw base.
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+    ctx.strokeStyle = '#0000FF';
+    ctx.shadowColor = '#0000FF';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, this.width/2, this.height/2, 0, 0, 2 * Math.PI);
+    ctx.stroke();
+    // Draw battery cell.
+    ctx.fillStyle = 'rgb(0, ' + Math.pow(this.battery, 1.8)*0xFF + ', 0)';
+    ctx.beginPath();
+    ctx.arc(this.batteryOffset, 0, 5, 0, 2 * Math.PI);
+    ctx.fill();
+}
+
+function updateDirectMovement() {
+    if (pressedKeys['left']) this.inertia.x -= this.movementForce;
+    if (pressedKeys['right']) this.inertia.x += this.movementForce;
+    if (pressedKeys['up']) this.inertia.y -= this.movementForce;
+    if (pressedKeys['down']) this.inertia.y += this.movementForce;
+    this.rotation = Math.atan2(this.inertia.y, this.inertia.x);
     this.x += this.inertia.x;
     this.y += this.inertia.y;
-    this.inertia.x *= this.friction;
-    this.inertia.y *= this.friction;
+}
+
+function updateVehicleMovement() {
+    if (pressedKeys['left']) this.rotation -= this.turnSpeed;
+    if (pressedKeys['right']) this.rotation += this.turnSpeed;
+    if (pressedKeys['up']) this.inertia.speed += this.movementForce;
+    if (pressedKeys['down']) this.inertia.speed -= this.movementForce;
+    this.x += Math.cos(this.rotation) * this.inertia.speed;
+    this.y += Math.sin(this.rotation) * this.inertia.speed;
+    camera.rotation = -this.rotation - TAU/4;
+}
+
+function updateDriftMovement() {
+    if (pressedKeys['left']) this.inertia.rotation -= this.turnSpeed / 10;
+    if (pressedKeys['right']) this.inertia.rotation += this.turnSpeed / 10;
+    if (pressedKeys['up']) {
+        this.inertia.x += Math.cos(this.rotation) * this.movementForce;
+        this.inertia.y += Math.sin(this.rotation) * this.movementForce;
+    }
+    if (pressedKeys['down']) {
+        this.inertia.x -= Math.cos(this.rotation) * this.movementForce;
+        this.inertia.y -= Math.sin(this.rotation) * this.movementForce;
+    }
+    this.rotation += this.inertia.rotation;
+    this.x += this.inertia.x;
+    this.y += this.inertia.y;
+    camera.rotation = -this.rotation - TAU/4;
+}
+
+player = makeObject({
+    x: world.width/2,
+    y: world.height/2,
+    width: 80,
+    height: 50,
+    inertia: {x: 0, y: 0, speed: 0, rotation: 0},
+    friction: 0.1,
+    rotationFriction: 0.1,
+    battery: 1,
+    rotation: 0,
+    batteryOffset: -10,
+    movementForce: 0.8,
+    turnSpeed: 0.04,
+    updateMovement: updateDirectMovement,
+}, function() {
+
+    this.updateMovement.bind(this)();
+
+    this.inertia.x *= (1 - this.friction);
+    this.inertia.y *= (1 - this.friction);
+    this.inertia.speed *= (1 - this.friction);
+    this.inertia.rotation *= (1 - this.rotationFriction);
 
     camera.x = this.x;
     camera.y = this.y;
@@ -157,24 +240,11 @@ player = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50,
     let quality = Math.min(0.5, this.battery) * 2;
     pixelation = 16 * (1-quality);
     frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
-}, function(ctx) {
-    // Draw base.
-    ctx.translate(this.x, this.y);
-    ctx.strokeStyle = '#0000FF';
-    ctx.shadowColor = '#0000FF';
-    ctx.shadowBlur = 10;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(0, 0, this.width/2, 0, 2 * Math.PI);
-    ctx.stroke();
-    // Draw battery cell.
-    ctx.fillStyle = 'rgb(0, ' + Math.pow(this.battery, 1.8)*0xFF + ', 0)';
-    ctx.beginPath();
-    ctx.arc(0, 0, 5, 0, 2 * Math.PI);
-    ctx.fill();
-});
 
-let drone = makeObject({x: world.width/2, y: world.height/2}, function() {
+    addExclusionZone(this, '#000022');
+}, renderPlayer);
+
+let drone = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50}, function() {
     if (this.target === undefined || (this.target.x === this.x && this.target.y === this.y)) {
         const delta = [{x: +1, y: 0}, {x: -1, y: 0}, {x: 0, y: +1}, {x: 0, y: -1}][Math.floor(Math.random()*4)];
         this.target = {
@@ -187,6 +257,8 @@ let drone = makeObject({x: world.width/2, y: world.height/2}, function() {
     if (this.target.x < this.x) this.x -= 1;
     if (this.target.y > this.y) this.y += 1;
     if (this.target.y < this.y) this.y -= 1;
+
+    addExclusionZone(this, '#220000');
 }, function(ctx) {
     ctx.strokeStyle = '#FF0000';
     ctx.shadowColor = '#FF0000';
@@ -257,6 +329,7 @@ function makeRingEffect(x, y, color) {
             bufferCtx.scale(scaling, scaling);
             bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
             bufferCtx.scale(camera.scale, camera.scale);
+            bufferCtx.rotate(camera.rotation);
             bufferCtx.translate(Math.round(-camera.x), Math.round(-camera.y));
             rendering.fire(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
             bufferCtx.restore();
