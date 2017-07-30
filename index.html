@@ -52,12 +52,17 @@ const rendering = makeChain();
 const updating = makeChain();
 const ui = makeChain();
 
-function lerp(obj, prop, end, duration, onFinish) {
+function lerp(obj, props, duration, onFinish) {
     duration = duration || 1;
-    const start = obj[prop];
+    const start = {};
+    for (let key in props) {
+        start[key] = obj[key];
+    }
     const startT = t;
     return updating.add(function(_, node) {
-        obj[prop] = start + (t - startT) * (end - start) / duration;
+        for (let key in props) {
+            obj[key] = start[key] + (t - startT) * (props[key] - start[key]) / duration;
+        }
         if (t - startT >= duration) {
             node.remove();
             onFinish && onFinish();
@@ -94,7 +99,7 @@ function addExclusionZone(obj, color) {
 // Draw infinite grid.
 rendering.add(function(ctx) {
     ctx.fillStyle = 'black';
-    ctx.fillRect(camera.x-width/2, camera.y-height/2, width, height);
+    ctx.fillRect(camera.x-width/2/camera.scale, camera.y-height/2/camera.scale, width/camera.scale, height/camera.scale);
     ctx.scale(gridSize, gridSize);
     // Cell center is inside rectangle, not corners.
     ctx.translate(0.5, 0.5);
@@ -110,12 +115,12 @@ rendering.add(function(ctx) {
     ctx.strokeStyle = '#005500';
     ctx.lineWidth = 1/gridSize;
     const topLeft = {
-        x: Math.floor((camera.x-width/2)/gridSize)-1,
-        y: Math.floor((camera.y-height/2)/gridSize)-1,
+        x: Math.floor((camera.x-width/2/camera.scale)/gridSize)-1,
+        y: Math.floor((camera.y-height/2/camera.scale)/gridSize)-1,
     }
     const bottomRight = {
-        x: Math.ceil((camera.x+width/2)/gridSize),
-        y: Math.ceil((camera.y+height/2)/gridSize),
+        x: Math.ceil((camera.x+width/2/camera.scale)/gridSize),
+        y: Math.ceil((camera.y+height/2/camera.scale)/gridSize),
     }
     for (let x = topLeft.x; x <= bottomRight.x; x++) {
         ctx.moveTo(x, topLeft.y);
@@ -284,8 +289,10 @@ drone.updateTarget = function() {
         {x: 0, y: -1}
     ][Math.floor(Math.random()*4)];
     this.rotation = Math.atan2(-delta.y, -delta.x);
-    lerp(this, 'x', gridSize * Math.round(this.x/gridSize + delta.x), 60);
-    lerp(this, 'y', gridSize * Math.round(this.y/gridSize + delta.y), 60, this.updateTarget);
+    lerp(this, {
+        x: gridSize * Math.round(this.x/gridSize + delta.x),
+        y: gridSize * Math.round(this.y/gridSize + delta.y),
+    }, 60, this.updateTarget);
 }.bind(drone);
 drone.updateTarget();
 
