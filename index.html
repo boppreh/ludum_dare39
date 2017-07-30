@@ -356,8 +356,8 @@ function makePlayer(x, y) {
         addExclusionZone({
             x: this.x,
             y: this.y,
-            width: this.width * Math.abs(Math.cos(this.rotation)) + this.height * Math.abs(Math.sin(this.rotation)),
-            height: this.width * Math.abs(Math.cos(this.rotation+TAU/4)) + this.height * Math.abs(Math.sin(this.rotation+TAU/4)),
+            width: absTrig(this.rotation, this.width, this.height),
+            height: absTrig(this.rotation, this.height, this.width),
         }, '#000022');
     }, function(ctx) {
         // Draw base.
