@@ -60,8 +60,8 @@ function lerp(obj, props, duration, onFinish) {
     });
 }
 
-function trig(angle, cos, sin) {
-    return Math.cos(angle)*cos + Math.sin(angle)*sin;
+function absTrig(angle, cos, sin) {
+    return Math.abs(Math.cos(angle))*cos + Math.abs(Math.sin(angle))*sin;
 };
 
 function Game(canvasId) {
@@ -203,10 +203,10 @@ game.rendering.add(function(ctx) {
 
     ctx.fillStyle = 'black';
     ctx.fillRect(
-        game.camera.x-trig(game.camera.rotation, horizontal, vertical),
-        game.camera.y-trig(game.camera.rotation, vertical, horizontal),
-        trig(game.camera.rotation, horizontal, vertical)*2,
-        trig(game.camera.rotation, vertical, horizontal)*2
+        game.camera.x-absTrig(game.camera.rotation, horizontal, vertical),
+        game.camera.y-absTrig(game.camera.rotation, vertical, horizontal),
+        absTrig(game.camera.rotation, horizontal, vertical)*2,
+        absTrig(game.camera.rotation, vertical, horizontal)*2
     );
     ctx.scale(gridSize, gridSize);
     // Cell center is inside rectangle, not corners.
@@ -223,12 +223,12 @@ game.rendering.add(function(ctx) {
     ctx.strokeStyle = '#005500';
     ctx.lineWidth = 1/gridSize;
     const topLeft = {
-        x: Math.floor((game.camera.x-trig(game.camera.rotation, horizontal, vertical))/gridSize)-1,
-        y: Math.floor((game.camera.y-trig(game.camera.rotation, vertical, horizontal))/gridSize)-1,
+        x: Math.floor((game.camera.x-absTrig(game.camera.rotation, horizontal, vertical))/gridSize)-1,
+        y: Math.floor((game.camera.y-absTrig(game.camera.rotation, vertical, horizontal))/gridSize)-1,
     }
     const bottomRight = {
-        x: Math.ceil((game.camera.x+trig(game.camera.rotation, horizontal, vertical))/gridSize),
-        y: Math.ceil((game.camera.y+trig(game.camera.rotation, vertical, horizontal))/gridSize),
+        x: Math.ceil((game.camera.x+absTrig(game.camera.rotation, horizontal, vertical))/gridSize),
+        y: Math.ceil((game.camera.y+absTrig(game.camera.rotation, vertical, horizontal))/gridSize),
     }
     for (let x = topLeft.x; x <= bottomRight.x; x++) {
         ctx.moveTo(x, topLeft.y);
