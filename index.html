@@ -30,7 +30,7 @@ function makeChain() {
             node.remove = function() {
                 node.prev.next = node.next;
                 if (tail === node) {
-                    tail = node;
+                    tail = node.prev;
                 }
             };
             return node.remove;
