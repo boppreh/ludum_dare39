@@ -100,7 +100,8 @@ rendering.add(function(ctx) {
     ctx.scale(gridSize, gridSize);
     ctx.translate(0.5, 0.5);
 
-    for (const zone of exclusionZones) {
+    for (let i = 0; i < exclusionZones.length; i++) {
+        let zone = exclusionZones[i];
         ctx.fillStyle = zone.color;
         ctx.fillRect(zone.startCellX, zone.startCellY, zone.endCellX - zone.startCellX, zone.endCellY - zone.startCellY);
     }
@@ -111,22 +112,10 @@ rendering.add(function(ctx) {
     ctx.lineWidth = 1/gridSize;
     for (let x = 0; x <= world.width/gridSize; x++) {
         ctx.moveTo(x, 0);
-        for (const zone of exclusionZones) {
-            if (x > zone.startCellX && x < zone.endCellX) {
-                //ctx.lineTo(x, zone.startCellY);
-                //ctx.moveTo(x, zone.endCellY);
-            }
-        }
         ctx.lineTo(x, world.height/gridSize);
     }
     for (let y = 0; y <= world.height/gridSize; y++) {
         ctx.moveTo(0, y);
-        for (const zone of exclusionZones) {
-            if (y > zone.startCellY && y < zone.endCellY) {
-                //ctx.lineTo(zone.startCellX, y);
-                //ctx.moveTo(zone.endCellX, y);
-            }
-        }
         ctx.lineTo(world.width/gridSize, y);
     }
     ctx.stroke();
@@ -285,7 +274,6 @@ drone.updateTarget = function() {
         {x: 0, y: -1}
     ][Math.floor(Math.random()*4)];
     this.rotation = Math.atan2(-delta.y, -delta.x);
-    console.log(delta);
     lerp(this, 'x', gridSize * Math.round(this.x/gridSize + delta.x), 60);
     lerp(this, 'y', gridSize * Math.round(this.y/gridSize + delta.y), 60, this.updateTarget);
 }.bind(drone);
