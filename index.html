@@ -56,7 +56,6 @@ function lerp(obj, prop, end, duration) {
     const step = (end - start) / duration;
     const startT = t;
     return updating.add(function(_, node) {
-        console.log(obj, prop);
         obj[prop] = start + step * (t - startT);
         if (t - startT >= duration) node.remove();
     });
