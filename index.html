@@ -27,18 +27,19 @@ function makeChain() {
             const node = {prev: tail, next: null, fn: fn};
             tail.next = node;
             tail = node;
-            return function() {
+            node.remove = function() {
                 node.prev.next = node.next;
                 if (tail === node) {
                     tail = node;
                 }
             };
+            return node.remove;
         },
         fire: function(arg, before, after) {
             let node = head;
             while (node !== null) {
                 if (before) before();
-                node.fn(arg);
+                node.fn(arg, node);
                 if (after) after();
                 node = node.next;
             }
@@ -49,6 +50,17 @@ function makeChain() {
 const rendering = makeChain();
 const updating = makeChain();
 const ui = makeChain();
+
+function lerp(obj, prop, end, duration) {
+    const start = obj[prop];
+    const step = (end - start) / duration;
+    const startT = t;
+    return updating.add(function(_, node) {
+        console.log(obj, prop);
+        obj[prop] = start + step * (t - startT);
+        if (t - startT >= duration) node.remove();
+    });
+}
 
 const TAU = 2 * Math.PI;
 const gridSize = 80;
@@ -179,7 +191,9 @@ function updateDirectMovement() {
     if (pressedKeys['right']) this.inertia.x += this.movementForce;
     if (pressedKeys['up']) this.inertia.y -= this.movementForce;
     if (pressedKeys['down']) this.inertia.y += this.movementForce;
-    this.rotation = Math.atan2(this.inertia.y, this.inertia.x);
+
+    if (pressedKeys['down'] || pressedKeys['up'] || pressedKeys['left'] || pressedKeys['right']) this.rotation = Math.atan2(this.inertia.y, this.inertia.x);
+    
     this.x += this.inertia.x;
     this.y += this.inertia.y;
 }
@@ -233,6 +247,8 @@ player = makeObject({
     this.inertia.y *= (1 - this.friction);
     this.inertia.speed *= (1 - this.friction);
     this.inertia.rotation *= (1 - this.rotationFriction);
+
+    this.rotation = (this.rotation + TAU) % TAU;
 
     camera.x = this.x;
     camera.y = this.y;
