@@ -29,6 +29,7 @@ function makeChain() {
             tail = node;
             node.remove = function() {
                 node.prev.next = node.next;
+                if (node.next) node.next.prev = node.prev;
                 if (tail === node) {
                     tail = node.prev;
                 }
@@ -51,13 +52,16 @@ const rendering = makeChain();
 const updating = makeChain();
 const ui = makeChain();
 
-function lerp(obj, prop, end, duration) {
+function lerp(obj, prop, end, duration, onFinish) {
+    duration = duration || 1;
     const start = obj[prop];
-    const step = (end - start) / duration;
     const startT = t;
     return updating.add(function(_, node) {
-        obj[prop] = start + step * (t - startT);
-        if (t - startT >= duration) node.remove();
+        obj[prop] = start + (t - startT) * (end - start) / duration;
+        if (t - startT >= duration) {
+            node.remove();
+            onFinish && onFinish();
+        }
     });
 }
 
@@ -259,29 +263,13 @@ player = makeObject({
     addExclusionZone(this, '#000022');
 }, renderPlayer);
 
-let drone = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50}, function() {
-    if (this.target === undefined || (this.target.x === this.x && this.target.y === this.y)) {
-        const delta = [{x: +1, y: 0}, {x: -1, y: 0}, {x: 0, y: +1}, {x: 0, y: -1}][Math.floor(Math.random()*4)];
-        this.target = {
-            x: gridSize * Math.round(this.x/gridSize + delta.x),
-            y: gridSize * Math.round(this.y/gridSize + delta.y),
-        };
-    }
-
-    if (this.target.x > this.x) this.x += 1;
-    if (this.target.x < this.x) this.x -= 1;
-    if (this.target.y > this.y) this.y += 1;
-    if (this.target.y < this.y) this.y -= 1;
-
-    addExclusionZone(this, '#220000');
-}, function(ctx) {
+let drone = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
     ctx.strokeStyle = '#FF0000';
     ctx.shadowColor = '#FF0000';
     ctx.shadowBlur = 10;
     ctx.lineWidth = 6;
     ctx.translate(this.x, this.y);
-    const angle = Math.atan2(this.y-this.target.y, this.x-this.target.x);
-    ctx.rotate(angle);
+    ctx.rotate(this.rotation);
     ctx.beginPath();
     ctx.moveTo(-20, 0);
     ctx.lineTo(+20, 20);
@@ -289,6 +277,19 @@ let drone = makeObject({x: world.width/2, y: world.height/2, width: 50, height: 
     ctx.closePath();
     ctx.stroke();
 });
+drone.updateTarget = function() {
+    const delta = [
+        {x: +1, y: 0},
+        {x: -1, y: 0},
+        {x: 0, y: +1},
+        {x: 0, y: -1}
+    ][Math.floor(Math.random()*4)];
+    this.rotation = Math.atan2(-delta.y, -delta.x);
+    console.log(delta);
+    lerp(this, 'x', gridSize * Math.round(this.x/gridSize + delta.x), 60);
+    lerp(this, 'y', gridSize * Math.round(this.y/gridSize + delta.y), 60, this.updateTarget);
+}.bind(drone);
+drone.updateTarget();
 
 function makeRingEffect(x, y, color) {
     let startT = t;
