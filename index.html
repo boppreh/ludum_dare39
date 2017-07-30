@@ -6,16 +6,12 @@
     </head>
 
     <body style='background: black;'>
-        <canvas id='canvas' width=800 height=600 style='display: block; margin-left: auto; margin-right: auto; margin: auto; display: block; image-rendering: optimizeSpeed; image-rendering: -moz-crisp-edges; image-rendering: -webkit-optimize-contrast; image-rendering: -o-crisp-edges; image-rendering: crisp-edges; -ms-interpolation-mode: nearest-neighbor;'></canvas>
+        <canvas width=800 height=600 style='display: block; margin-left: auto; margin-right: auto; margin: auto; display: block;'></canvas>
 
         <script>
 "use strict";
 
-const pressedKeys = {};
-let width = 1;
-let height = 1;
-let camera = {x: 0, y: 0, scale: 1, rotation: 0, pixelation: 0, renderingsPerFrame: 1};
-let t = 0;
+const TAU = 2 * Math.PI;
 
 function makeChain() {
     const head = {prev: null, next: null, fn: function(){}};
@@ -46,43 +42,146 @@ function makeChain() {
     }
 }
 
-const rendering = makeChain();
-const updating = makeChain();
-const ui = makeChain();
-
 function lerp(obj, props, duration, onFinish) {
     duration = duration || 1;
     const start = {};
     for (let key in props) {
         start[key] = obj[key];
     }
-    const startT = t;
-    return updating.add(function(_, node) {
+    const startT = game.t;
+    return game.updating.add(function(_, node) {
         for (let key in props) {
-            obj[key] = start[key] + (t - startT) * (props[key] - start[key]) / duration;
+            obj[key] = start[key] + (game.t - startT) * (props[key] - start[key]) / duration;
         }
-        if (t - startT >= duration) {
+        if (game.t - startT >= duration) {
             node.remove();
             onFinish && onFinish();
         }
     });
 }
+
 function trig(angle, cos, sin) {
     return Math.cos(angle)*cos + Math.sin(angle)*sin;
 };
 
-const TAU = 2 * Math.PI;
+function Game(canvasId) {
+    const canvas = canvasId ? document.getElementById(canvasId) : document.getElementsByTagName('canvas')[0];
+    canvas.style['image-rendering'] = '-moz-crisp-edges';
+    canvas.style['image-rendering'] = '-webkit-optimize-contrast';
+    canvas.style['image-rendering'] = '-o-crisp-edges';
+    canvas.style['image-rendering'] = 'crisp-edges';
+    canvas.style['-ms-interpolation-mode'] = 'nearest-neighbor;';
+    const ctx = canvas.getContext('2d');
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = false;
+
+    const game = {
+        pressedKeys: {},
+        width: canvas.width,
+        height: canvas.height,
+        camera: {x: 0, y: 0, scale: 1, rotation: 0, pixelation: 0, renderingsPerFrame: 1},
+        t: 0,
+        rendering: makeChain(),
+        updating: makeChain(),
+        ui: makeChain(),
+    };
+
+    const buffer = document.createElement("canvas");
+    buffer.style['image-rendering'] = '-moz-crisp-edges';
+    buffer.style['image-rendering'] = '-webkit-optimize-contrast';
+    buffer.style['image-rendering'] = '-o-crisp-edges';
+    buffer.style['image-rendering'] = 'crisp-edges';
+    buffer.style['-ms-interpolation-mode'] = 'nearest-neighbor;';
+    buffer.width = game.width;
+    buffer.height = game.height;
+    const bufferCtx = buffer.getContext('2d');
+    bufferCtx.webkitImageSmoothingEnabled = false;
+    bufferCtx.imageSmoothingEnabled = false;
+
+    let frameReady = 0;
+    let scaling = 1;
+
+    function updateFrame() {
+        game.t++;
+
+        game.updating.fire();
+
+        frameReady += game.camera.renderingsPerFrame + 0.01;
+        if (frameReady >= 1) {
+            frameReady -= 1;
+            scaling = 1 / (game.camera.pixelation + 1);
+
+            bufferCtx.save();
+            bufferCtx.fillStyle = '#111';
+            bufferCtx.fillRect(0, 0, game.width, game.height);
+            bufferCtx.scale(scaling, scaling);
+            bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
+            bufferCtx.scale(game.camera.scale, game.camera.scale);
+            bufferCtx.rotate(game.camera.rotation);
+            bufferCtx.translate(Math.round(-game.camera.x), Math.round(-game.camera.y));
+            game.rendering.fire(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
+            bufferCtx.restore();
+        }
+
+        ctx.fillRect(0, 0, game.width, game.height);
+        ctx.drawImage(buffer, 0, 0, game.width*scaling, game.height*scaling, 0, 0, game.width, game.height);
+        ctx.save();
+
+        game.ui.fire(ctx, ctx.save.bind(ctx), ctx.restore.bind(ctx));
+
+        ctx.restore();
+
+        window.requestAnimationFrame(updateFrame);
+    }
+    window.requestAnimationFrame(updateFrame);
+
+    const KEY_NAME_BY_KEYCODE = {
+        32: 'space', 37: 'left', 38: 'up', 39: 'right',
+        40: 'down', 27: 'esc', 13: 'enter',
+        17: 'ctrl', 9: 'alt'
+    };
+    function processKeyEvent(event, isDown) {
+        const keycode = event.which,
+            hasCtrl = event.ctrlKey,
+            isKnownSpecial = KEY_NAME_BY_KEYCODE[keycode],
+            isAlpha = keycode >= 48 && keycode <= 90;
+
+        game.pressedKeys[keycode] = isDown;
+        if (isKnownSpecial) {
+            game.pressedKeys[KEY_NAME_BY_KEYCODE[keycode]] = isDown;
+        }
+        if (isAlpha) {
+            game.pressedKeys[String.fromCharCode(keycode).toUpperCase()] = isDown;
+            game.pressedKeys[String.fromCharCode(keycode).toLowerCase()] = isDown;
+        }
+
+        if (!hasCtrl && (isKnownSpecial || isAlpha)) {
+            event.preventDefault();
+        }    
+    }
+    window.addEventListener('keydown', function(event) {
+        processKeyEvent(event, true);
+    });
+    window.addEventListener('keyup', function(event) {
+        processKeyEvent(event, false);
+    });
+
+    return game;
+}
+
+const game = Game();
+
 const gridSize = 80;
 let player = null;
 const messages = [];
 let exclusionZones;
-updating.add(function() {
+game.updating.add(function() {
     exclusionZones = [];
 })
 
 function makeObject(obj, updateFn, renderFn) {
-    const removeUpdate = updating.add(updateFn.bind(obj));
-    const removeEffect = rendering.add(renderFn.bind(obj));
+    const removeUpdate = game.updating.add(updateFn.bind(obj));
+    const removeEffect = game.rendering.add(renderFn.bind(obj));
     obj.destroy = function() { removeUpdate(); removeEffect(); };
     return obj;
 }
@@ -98,16 +197,16 @@ function addExclusionZone(obj, color) {
 }
 
 // Draw infinite grid.
-rendering.add(function(ctx) {
-    const horizontal = width/2/camera.scale;
-    const vertical = height/2/camera.scale;
+game.rendering.add(function(ctx) {
+    const horizontal = game.width/2/game.camera.scale;
+    const vertical = game.height/2/game.camera.scale;
 
     ctx.fillStyle = 'black';
     ctx.fillRect(
-        camera.x-trig(camera.rotation, horizontal, vertical),
-        camera.y-trig(camera.rotation, vertical, horizontal),
-        trig(camera.rotation, horizontal, vertical)*2,
-        trig(camera.rotation, vertical, horizontal)*2
+        game.camera.x-trig(game.camera.rotation, horizontal, vertical),
+        game.camera.y-trig(game.camera.rotation, vertical, horizontal),
+        trig(game.camera.rotation, horizontal, vertical)*2,
+        trig(game.camera.rotation, vertical, horizontal)*2
     );
     ctx.scale(gridSize, gridSize);
     // Cell center is inside rectangle, not corners.
@@ -124,12 +223,12 @@ rendering.add(function(ctx) {
     ctx.strokeStyle = '#005500';
     ctx.lineWidth = 1/gridSize;
     const topLeft = {
-        x: Math.floor((camera.x-trig(camera.rotation, horizontal, vertical))/gridSize)-1,
-        y: Math.floor((camera.y-trig(camera.rotation, vertical, horizontal))/gridSize)-1,
+        x: Math.floor((game.camera.x-trig(game.camera.rotation, horizontal, vertical))/gridSize)-1,
+        y: Math.floor((game.camera.y-trig(game.camera.rotation, vertical, horizontal))/gridSize)-1,
     }
     const bottomRight = {
-        x: Math.ceil((camera.x+trig(camera.rotation, horizontal, vertical))/gridSize),
-        y: Math.ceil((camera.y+trig(camera.rotation, vertical, horizontal))/gridSize),
+        x: Math.ceil((game.camera.x+trig(game.camera.rotation, horizontal, vertical))/gridSize),
+        y: Math.ceil((game.camera.y+trig(game.camera.rotation, vertical, horizontal))/gridSize),
     }
     for (let x = topLeft.x; x <= bottomRight.x; x++) {
         ctx.moveTo(x, topLeft.y);
@@ -143,7 +242,7 @@ rendering.add(function(ctx) {
 });
 
 // Update messages.
-updating.add(function() {
+game.updating.add(function() {
     for (let i = messages.length-1; i >= 0; i--) {
         const message = messages[i];
         message.time -= 1;
@@ -152,7 +251,7 @@ updating.add(function() {
         }
     }
 
-    if (t % 100 == 0) {
+    if (game.t % 100 == 0) {
         const color = ['#FF5555', '#6666FF', '#FFFF66', '#FFFFFF'][Math.floor(Math.random()*4)];
         // http://japaneseemoticons.me/all-japanese-emoticons/
         const text = '(╯°□°）╯︵ ┻━┻ ' + Math.ceil(Math.random() * 100);
@@ -161,7 +260,7 @@ updating.add(function() {
 });
 
 // Render messages.
-ui.add(function(ctx) {
+game.ui.add(function(ctx) {
     const fontSize = 30;
     const margin = 10;
     const padding = 3;
@@ -175,106 +274,123 @@ ui.add(function(ctx) {
         ctx.fillStyle = message.color;
         ctx.font = (message.bold ? 'bold ' : '') + fontSize + 'px courier new';
         const x = margin;
-        const y = height-(messages.length-i-1)*(fontSize+padding) - margin;
+        const y = game.height-(messages.length-i-1)*(fontSize+padding) - margin;
         ctx.strokeText(message.text, margin, y);
         ctx.fillText(message.text, margin, y);
     }
 });
 
 function updateDirectMovement() {
-    if (pressedKeys['left']) this.inertia.x -= this.movementForce;
-    if (pressedKeys['right']) this.inertia.x += this.movementForce;
-    if (pressedKeys['up']) this.inertia.y -= this.movementForce;
-    if (pressedKeys['down']) this.inertia.y += this.movementForce;
+    if (game.pressedKeys['left']) this.inertia.x -= this.movementForce;
+    if (game.pressedKeys['right']) this.inertia.x += this.movementForce;
+    if (game.pressedKeys['up']) this.inertia.y -= this.movementForce;
+    if (game.pressedKeys['down']) this.inertia.y += this.movementForce;
 
-    if (pressedKeys['down'] || pressedKeys['up'] || pressedKeys['left'] || pressedKeys['right']) this.rotation = Math.atan2(this.inertia.y, this.inertia.x);
+    if (game.pressedKeys['down'] || game.pressedKeys['up'] || game.pressedKeys['left'] || game.pressedKeys['right']) this.rotation = Math.atan2(this.inertia.y, this.inertia.x);
     
     this.x += this.inertia.x;
     this.y += this.inertia.y;
 }
 
 function updateVehicleMovement() {
-    if (pressedKeys['left']) this.rotation -= this.turnSpeed;
-    if (pressedKeys['right']) this.rotation += this.turnSpeed;
-    if (pressedKeys['up']) this.inertia.speed += this.movementForce;
-    if (pressedKeys['down']) this.inertia.speed -= this.movementForce;
+    if (game.pressedKeys['left']) this.rotation -= this.turnSpeed;
+    if (game.pressedKeys['right']) this.rotation += this.turnSpeed;
+    if (game.pressedKeys['up']) this.inertia.speed += this.movementForce;
+    if (game.pressedKeys['down']) this.inertia.speed -= this.movementForce;
     this.x += Math.cos(this.rotation) * this.inertia.speed;
     this.y += Math.sin(this.rotation) * this.inertia.speed;
-    camera.rotation = -this.rotation - TAU/4;
+    game.camera.rotation = -this.rotation - TAU/4;
 }
 
 function updateDriftMovement() {
-    if (pressedKeys['left']) this.inertia.rotation -= this.turnSpeed / 10;
-    if (pressedKeys['right']) this.inertia.rotation += this.turnSpeed / 10;
-    if (pressedKeys['up']) {
+    if (game.pressedKeys['left']) this.inertia.rotation -= this.turnSpeed / 10;
+    if (game.pressedKeys['right']) this.inertia.rotation += this.turnSpeed / 10;
+    if (game.pressedKeys['up']) {
         this.inertia.x += Math.cos(this.rotation) * this.movementForce;
         this.inertia.y += Math.sin(this.rotation) * this.movementForce;
     }
-    if (pressedKeys['down']) {
+    if (game.pressedKeys['down']) {
         this.inertia.x -= Math.cos(this.rotation) * this.movementForce;
         this.inertia.y -= Math.sin(this.rotation) * this.movementForce;
     }
     this.rotation += this.inertia.rotation;
     this.x += this.inertia.x;
     this.y += this.inertia.y;
-    camera.rotation = -this.rotation - TAU/4;
+    game.camera.rotation = -this.rotation - TAU/4;
 }
 
-player = makeObject({
-    x: 0,
-    y: 0,
-    width: 80,
-    height: 50,
-    inertia: {x: 0, y: 0, speed: 0, rotation: 0},
-    friction: 0.1,
-    rotationFriction: 0.1,
-    battery: 1,
-    rotation: 0,
-    batteryOffset: -10,
-    movementForce: 0.8,
-    turnSpeed: 0.04,
-    updateMovement: updateDirectMovement,
-}, function() {
+function makePlayer(x, y) {
+    const p = makeObject({
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 50,
+        inertia: {x: 0, y: 0, speed: 0, rotation: 0},
+        friction: 0.1,
+        rotationFriction: 0.1,
+        battery: 1,
+        rotation: 0,
+        batteryOffset: -10,
+        movementForce: 0.8,
+        turnSpeed: 0.04,
+        updateMovement: updateDirectMovement,
+        dead: false,
+    }, function() {
 
-    this.updateMovement.bind(this)();
+        this.updateMovement.bind(this)();
 
-    this.inertia.x *= (1 - this.friction);
-    this.inertia.y *= (1 - this.friction);
-    this.inertia.speed *= (1 - this.friction);
-    this.inertia.rotation *= (1 - this.rotationFriction);
+        this.inertia.x *= (1 - this.friction);
+        this.inertia.y *= (1 - this.friction);
+        this.inertia.speed *= (1 - this.friction);
+        this.inertia.rotation *= (1 - this.rotationFriction);
 
-    this.rotation = (this.rotation + TAU) % TAU;
+        this.rotation = (this.rotation + TAU) % TAU;
 
-    camera.x = this.x;
-    camera.y = this.y;
+        game.camera.x = this.x;
+        game.camera.y = this.y;
 
-    let quality = Math.min(0.5, this.battery) * 2;
-    camera.pixelation = 16 * (1-quality);
-    camera.renderingsPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
+        let quality = Math.min(0.5, this.battery) * 2;
+        game.camera.pixelation = 16 * (1-quality);
+        game.camera.renderingsPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
 
-    addExclusionZone({
-        x: this.x,
-        y: this.y,
-        width: this.width * Math.abs(Math.cos(this.rotation)) + this.height * Math.abs(Math.sin(this.rotation)),
-        height: this.width * Math.abs(Math.cos(this.rotation+TAU/4)) + this.height * Math.abs(Math.sin(this.rotation+TAU/4)),
-    }, '#000022');
-}, function(ctx) {
-    // Draw base.
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rotation);
-    ctx.strokeStyle = '#0000FF';
-    ctx.shadowColor = '#0000FF';
-    ctx.shadowBlur = 10;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, this.width/2, this.height/2, 0, 0, 2 * Math.PI);
-    ctx.stroke();
-    // Draw battery cell.
-    ctx.fillStyle = 'rgb(0, ' + Math.pow(this.battery, 1.8)*0xFF + ', 0)';
-    ctx.beginPath();
-    ctx.arc(this.batteryOffset, 0, 5, 0, 2 * Math.PI);
-    ctx.fill();
-});
+        addExclusionZone({
+            x: this.x,
+            y: this.y,
+            width: this.width * Math.abs(Math.cos(this.rotation)) + this.height * Math.abs(Math.sin(this.rotation)),
+            height: this.width * Math.abs(Math.cos(this.rotation+TAU/4)) + this.height * Math.abs(Math.sin(this.rotation+TAU/4)),
+        }, '#000022');
+    }, function(ctx) {
+        // Draw base.
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        if (this.dead) {
+            ctx.strokeStyle = '#000077';
+            ctx.shadowColor = '#000077';
+        } else {
+            ctx.strokeStyle = '#0000FF';
+            ctx.shadowColor = '#0000FF';
+        }
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.width/2, this.height/2, 0, 0, 2 * Math.PI);
+        ctx.stroke();
+        // Draw battery cell.
+        if (!this.dead) {
+            ctx.fillStyle = 'rgb(0, ' + Math.pow(this.battery, 1.8)*0xFF + ', 0)';
+            ctx.beginPath();
+            ctx.arc(this.batteryOffset, 0, 5, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    });
+    p.die = function() {
+        this.dead = true;
+        this.updateMovement = function() {};
+    }.bind(p);
+    return p;
+}
+
+player = makePlayer(0, 0);
 
 let drone = makeObject({x: 0, y: 0, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
     ctx.strokeStyle = '#FF0000';
@@ -318,96 +434,6 @@ function makeRingEffect(x, y, color) {
         return alpha > 0;
     });
 }
-
-(function() {
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.webkitImageSmoothingEnabled = false;
-    ctx.imageSmoothingEnabled = false;
-
-    width = canvas.width;
-    height = canvas.height;
-
-    const buffer = document.createElement("canvas");
-    buffer.style['image-rendering'] = '-moz-crisp-edges';
-    buffer.style['image-rendering'] = '-webkit-optimize-contrast';
-    buffer.style['image-rendering'] = '-o-crisp-edges';
-    buffer.style['image-rendering'] = 'crisp-edges';
-    buffer.style['-ms-interpolation-mode'] = 'nearest-neighbor;';
-    buffer.width = width;
-    buffer.height = height;
-    const bufferCtx = buffer.getContext('2d');
-    bufferCtx.webkitImageSmoothingEnabled = false;
-    bufferCtx.imageSmoothingEnabled = false;
-
-    let frameReady = 0;
-    let scaling = 1;
-
-    function updateFrame() {
-        t++;
-
-        updating.fire();
-
-        frameReady += camera.renderingsPerFrame + 0.01;
-        if (frameReady >= 1) {
-            frameReady -= 1;
-            scaling = 1 / (camera.pixelation + 1);
-
-            bufferCtx.save();
-            bufferCtx.fillStyle = '#111';
-            bufferCtx.fillRect(0, 0, width, height);
-            bufferCtx.scale(scaling, scaling);
-            bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
-            bufferCtx.scale(camera.scale, camera.scale);
-            bufferCtx.rotate(camera.rotation);
-            bufferCtx.translate(Math.round(-camera.x), Math.round(-camera.y));
-            rendering.fire(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
-            bufferCtx.restore();
-        }
-
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(buffer, 0, 0, width*scaling, height*scaling, 0, 0, width, height);
-        ctx.save();
-
-        ui.fire(ctx, ctx.save.bind(ctx), ctx.restore.bind(ctx));
-
-        ctx.restore();
-
-        window.requestAnimationFrame(updateFrame);
-    }
-    window.requestAnimationFrame(updateFrame);
-
-    const KEY_NAME_BY_KEYCODE = {
-        32: 'space', 37: 'left', 38: 'up', 39: 'right',
-        40: 'down', 27: 'esc', 13: 'enter',
-        17: 'ctrl', 9: 'alt'
-    };
-    function processKeyEvent(event, isDown) {
-        const keycode = event.which,
-            hasCtrl = event.ctrlKey,
-            isKnownSpecial = KEY_NAME_BY_KEYCODE[keycode],
-            isAlpha = keycode >= 48 && keycode <= 90;
-
-        pressedKeys[keycode] = isDown;
-        if (isKnownSpecial) {
-            pressedKeys[KEY_NAME_BY_KEYCODE[keycode]] = isDown;
-        }
-        if (isAlpha) {
-            pressedKeys[String.fromCharCode(keycode).toUpperCase()] = isDown;
-            pressedKeys[String.fromCharCode(keycode).toLowerCase()] = isDown;
-        }
-
-        if (!hasCtrl && (isKnownSpecial || isAlpha)) {
-            event.preventDefault();
-        }    
-    }
-    window.addEventListener('keydown', function(event) {
-        processKeyEvent(event, true);
-    });
-    window.addEventListener('keyup', function(event) {
-        processKeyEvent(event, false);
-    });
-})();
         </script>
     </body>
 </html>
