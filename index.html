@@ -14,9 +14,7 @@
 const pressedKeys = {};
 let width = 1;
 let height = 1;
-let pixelation = 0;
-let frameBuildup = 1;
-let camera = {x: 0, y: 0, scale: 1, rotation: 0};
+let camera = {x: 0, y: 0, scale: 1, rotation: 0, pixelation: 0, renderingsPerFrame: 1};
 let t = 0;
 
 function makeChain() {
@@ -251,8 +249,8 @@ player = makeObject({
     camera.y = this.y;
 
     let quality = Math.min(0.5, this.battery) * 2;
-    pixelation = 16 * (1-quality);
-    frameBuildup = 0.95 * Math.pow(quality, 3) + 0.05;
+    camera.pixelation = 16 * (1-quality);
+    camera.renderingsPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
 
     addExclusionZone({
         x: this.x,
@@ -350,10 +348,10 @@ function makeRingEffect(x, y, color) {
 
         updating.fire();
 
-        frameReady += frameBuildup + 0.01;
+        frameReady += camera.renderingsPerFrame + 0.01;
         if (frameReady >= 1) {
             frameReady -= 1;
-            scaling = 1 / (pixelation + 1);
+            scaling = 1 / (camera.pixelation + 1);
 
             bufferCtx.save();
             bufferCtx.fillStyle = '#111';
