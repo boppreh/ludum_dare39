@@ -69,6 +69,9 @@ function lerp(obj, props, duration, onFinish) {
         }
     });
 }
+function trig(angle, cos, sin) {
+    return Math.cos(angle)*cos + Math.sin(angle)*sin;
+};
 
 const TAU = 2 * Math.PI;
 const gridSize = 80;
@@ -98,8 +101,16 @@ function addExclusionZone(obj, color) {
 
 // Draw infinite grid.
 rendering.add(function(ctx) {
+    const horizontal = width/2/camera.scale;
+    const vertical = height/2/camera.scale;
+
     ctx.fillStyle = 'black';
-    ctx.fillRect(camera.x-width/2/camera.scale, camera.y-height/2/camera.scale, width/camera.scale, height/camera.scale);
+    ctx.fillRect(
+        camera.x-trig(camera.rotation, horizontal, vertical),
+        camera.y-trig(camera.rotation, vertical, horizontal),
+        trig(camera.rotation, horizontal, vertical)*2,
+        trig(camera.rotation, vertical, horizontal)*2
+    );
     ctx.scale(gridSize, gridSize);
     // Cell center is inside rectangle, not corners.
     ctx.translate(0.5, 0.5);
@@ -115,12 +126,12 @@ rendering.add(function(ctx) {
     ctx.strokeStyle = '#005500';
     ctx.lineWidth = 1/gridSize;
     const topLeft = {
-        x: Math.floor((camera.x-width/2/camera.scale)/gridSize)-1,
-        y: Math.floor((camera.y-height/2/camera.scale)/gridSize)-1,
+        x: Math.floor((camera.x-trig(camera.rotation, horizontal, vertical))/gridSize)-1,
+        y: Math.floor((camera.y-trig(camera.rotation, vertical, horizontal))/gridSize)-1,
     }
     const bottomRight = {
-        x: Math.ceil((camera.x+width/2/camera.scale)/gridSize),
-        y: Math.ceil((camera.y+height/2/camera.scale)/gridSize),
+        x: Math.ceil((camera.x+trig(camera.rotation, horizontal, vertical))/gridSize),
+        y: Math.ceil((camera.y+trig(camera.rotation, vertical, horizontal))/gridSize),
     }
     for (let x = topLeft.x; x <= bottomRight.x; x++) {
         ctx.moveTo(x, topLeft.y);
