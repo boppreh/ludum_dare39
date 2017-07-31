@@ -81,6 +81,7 @@ const easing = {
     // bouncing at the end
     bounce: function (t) { return 1 - Math.abs(1 - easing.elasticIn(t)); },
 };
+easing.to = easing.quadInOut;
 
 function Game(canvasId) {
     const canvas = canvasId ? document.getElementById(canvasId) : document.getElementsByTagName('canvas')[0];
@@ -195,16 +196,19 @@ function Game(canvasId) {
         return obj;
     }
 
-    game.interpolate = function(obj, props, duration, onFinish, fn) {
+    game.interpolate = function(obj, props, duration, onFinish, ease) {
         duration = duration || 1;
+        if (typeof props !== "function") {
+            props = function() { return props };
+        }
         const start = {};
-        for (let key in props) {
+        for (let key in props()) {
             start[key] = obj[key];
         }
         const startT = game.t;
         const stop = game.update.add(function() {
-            for (let key in props) {
-                obj[key] = start[key] + fn((game.t-startT)/duration) * (props[key] - start[key]);
+            for (let key in props()) {
+                obj[key] = start[key] + ease((game.t-startT)/duration) * (props()[key] - start[key]);
             }
             if (game.t - startT >= duration) {
                 stop();
@@ -212,12 +216,11 @@ function Game(canvasId) {
             }
         });
         return stop;
-    }
+    };
 
     for (let name in easing) {
-        const fn = easing[name]
         game[name] = function(obj, props, duration, onFinish) {
-            game.interpolate(obj, props, duration, onFinish, fn);
+            game.interpolate(obj, props, duration, onFinish, easing[name]);
         };
     }
 
@@ -327,7 +330,7 @@ game.ui.add(function(ctx) {
     ctx.strokeStyle = 'black';
     for (let i = 0; i < messages.length; i++) {
         const message = messages[i];
-        const alpha = Math.min(1, message.time/fadeTime);
+        const alpha = easing.to(Math.min(1, message.time/fadeTime));
         ctx.globalAlpha = alpha;
         ctx.fillStyle = message.color;
         ctx.font = (message.bold ? 'bold ' : '') + fontSize + 'px courier new';
@@ -348,6 +351,7 @@ function updateDirectMovement() {
     
     player.x += player.inertia.x;
     player.y += player.inertia.y;
+    game.camera.rotation = 0;
 }
 
 function updateVehicleMovement() {
@@ -453,10 +457,10 @@ controlChain.add(function() {
 });
 controlChain.add(updateDirectMovement);
 controlChain.add(function() {
-    if (game.pressedKeys['space'] && player.age > 60) {
+    if (game.pressedKeys['ctrl'] && player.age > 60) {
         player.die();
         createPlayer();
-        game.bounce(game.camera, {x: player.x, y: player.y}, 30);
+        game.to(game.camera, function() { return {x: player.x, y: player.y}; }, 30);
     }
 });
 
