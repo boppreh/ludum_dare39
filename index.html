@@ -291,6 +291,7 @@ game.render.add(function(ctx) {
         x: Math.ceil((game.camera.x+absTrig(game.camera.rotation, horizontal, vertical))/gridSize),
         y: Math.ceil((game.camera.y+absTrig(game.camera.rotation, vertical, horizontal))/gridSize),
     }
+    ctx.beginPath();
     for (let x = topLeft.x; x <= bottomRight.x; x++) {
         ctx.moveTo(x, topLeft.y);
         ctx.lineTo(x, bottomRight.y);
