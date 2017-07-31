@@ -561,7 +561,7 @@ function story(parts) {
     }
 }
 
-story([
+const introduction = [
     function() { game.camera.scale = 0.1, game.camera.rotation = TAU/4, game.camera.x = 500; },
     2,
     characters.red("So, did you finish your new drone design?"),
@@ -584,16 +584,35 @@ story([
     characters.red("Looks small."),
     2,
     characters.blue("I'm sure it'll be fine."),
-    2,
+    6,
     function() {
         if (controlChain.firstMovement.hasFired) {
-            characters.red("How to you move it?");
+            story([
+                characters.red("How are you moving it?"),
+                3,
+                characters.blue("I'm not. It's 100% autonomous."),      
+                3,
+                [story, tutorial],
+            ]);
         } else {
-            characters.red("Does it move?");
+            story([
+                characters.red("Does it move?"),
+                2,
+                characters.blue("Yes."),
+                1,
+                characters.blue("Something about \"arrow keys\"."),
+                [story, tutorial],
+            ]);
         }
     },
-]);
-game.advance(25 * 60);
+];
+
+const tutorial = [
+    characters.red("That's it."),
+];
+
+story(introduction);
+game.advance(20 * 60);
 
 /*
 let drone = addObject({x: 0, y: 0, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
