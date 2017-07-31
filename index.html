@@ -198,9 +198,10 @@ function Game(canvasId) {
     }
 
     game.interpolate = function(obj, props, duration, onFinish, ease) {
-        duration = duration || 1;
+        duration = duration || 60;
         if (typeof props !== "function") {
-            props = function() { return props };
+            const fixed = props;
+            props = function() { return fixed; };
         }
         const start = {};
         for (let key in props()) {
@@ -210,6 +211,7 @@ function Game(canvasId) {
         const stop = game.update.add(function() {
             for (let key in props()) {
                 obj[key] = start[key] + ease((game.t-startT)/duration) * (props()[key] - start[key]);
+                console.log(obj[key])
             }
             if (game.t - startT >= duration) {
                 stop();
@@ -220,8 +222,9 @@ function Game(canvasId) {
     };
 
     for (let name in easing) {
+        const ease = easing[name];
         game[name] = function(obj, props, duration, onFinish) {
-            game.interpolate(obj, props, duration, onFinish, easing[name]);
+            return game.interpolate(obj, props, duration, onFinish, ease);
         };
     }
 
