@@ -224,6 +224,15 @@ function Game(canvasId) {
         };
     }
 
+    game.delay = function(time, fn) {
+        const stop = game.update.add(function() {
+            if (--time === 0) {
+                fn();
+                stop();
+            }
+        });
+    };
+
     return game;
 }
 
@@ -303,13 +312,6 @@ game.update.add(function() {
             messages.splice(i, 1);
         }
     }
-
-    if (game.t % 100 == 0) {
-        const color = ['#FF5555', '#6666FF', '#FFFF66', '#FFFFFF'][Math.floor(Math.random()*4)];
-        // http://japaneseemoticons.me/all-japanese-emoticons/
-        const text = '(╯°□°）╯︵ ┻━┻ ' + Math.ceil(Math.random() * 100);
-        messages.push({text: text, time: 310, color: color, bold: color=='#FFFFFF'});
-    }
 });
 
 game.ui.add(function(ctx) {
@@ -322,11 +324,11 @@ game.ui.add(function(ctx) {
 
 // Render messages.
 game.ui.add(function(ctx) {
-    const fontSize = 30;
+    const fontSize = 26;
     const margin = 10;
     const padding = 3;
     const fadeTime = 120;
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 3;
     ctx.strokeStyle = 'black';
     for (let i = 0; i < messages.length; i++) {
         const message = messages[i];
@@ -469,7 +471,52 @@ function createPlayer() {
     player.die.add(player.updating.add(controlChain));
 }
 
-createPlayer();
+const defaultMessageTime = 360;
+const characters = {
+    blue: function(text, time) {
+        return {text: text, time: time || defaultMessageTime, color: '#6666FF', bold: false}
+    },
+    red: function(text, time) {
+        return {text: text, time: time || defaultMessageTime, color: '#FF5555', bold: false}
+    },
+    yellow: function(text, time) {
+        // http://japaneseemoticons.me/all-japanese-emoticons/
+        return {text: text, time: time || defaultMessageTime, color: '#FFFF66', bold: false}
+    },
+    white: function(text, time) {
+        return {text: text, time: time || defaultMessageTime, color: '#FFFFFF', bold: true}
+    },
+};
+
+function story(parts) {
+    if (parts.length === 0) return;
+
+    const first = parts.shift();
+    if (typeof first === 'number') {
+        game.delay(first * 60, function() { story(parts); });
+    } else {
+        if (typeof first === 'function') {
+            first();
+        } else {
+            messages.push(first);
+        }
+        story(parts);
+    }
+}
+story([
+    function() { game.camera.scale = 0.5, game.camera.x = 1000; },
+    2,
+    characters.red('So, did you finish your new drone design?'),
+    3.5,
+    characters.blue('Almost there...'),
+    3,
+    characters.blue('Done! Check this'),
+    1,
+    function() { game.to(game.camera, {scale: 2, x: 0, y: 0}, 50); },
+    1,
+    createPlayer,
+    function() { player.alpha = 0; game.to(player, {alpha: 1}, 60); },
+]);
 
 /*
 let drone = addObject({x: 0, y: 0, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
