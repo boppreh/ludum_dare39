@@ -13,6 +13,7 @@
 
 const TAU = 2 * Math.PI;
 
+const REMOVE_SELF = {};
 function makeChain() {
     const head = {prev: null, next: null, fn: function(){}};
     let tail = head;
@@ -20,7 +21,9 @@ function makeChain() {
         let node = head;
         while (node !== null) {
             if (before) before();
-            node.fn(arg);
+            if (node.fn(arg) === REMOVE_SELF) {
+                node.remove();
+            }
             if (after) after();
             node = node.next;
         }
@@ -29,13 +32,17 @@ function makeChain() {
         const node = {prev: tail, next: null, fn: fn};
         tail.next = node;
         tail = node;
-        return function() {
+        node.remove = function() {
             node.prev.next = node.next;
             if (node.next) node.next.prev = node.prev;
             if (tail === node) {
                 tail = node.prev;
             }
         };
+        return node.remove;
+    }
+    fire.isEmpty = function() {
+        return head === tail;
     }
     return fire;
 }
@@ -105,6 +112,13 @@ function Game(canvasId) {
         ui: makeChain(),
         lastNow: performance.now(),
     };
+    game.update.add(function() {
+        game.t++;
+
+        const newNow = performance.now();
+        game.d = newNow - game.lastNow;
+        game.lastNow = newNow;
+    });
 
     const buffer = document.createElement("canvas");
     buffer.style['image-rendering'] = '-moz-crisp-edges';
@@ -122,11 +136,6 @@ function Game(canvasId) {
     let scaling = 1;
 
     function updateFrame() {
-        game.t++;
-        const newNow = performance.now();
-        game.d = newNow - game.lastNow;
-        game.lastNow = newNow;
-
         game.update();
 
         frameReady += game.camera.rendersPerFrame;
@@ -210,17 +219,15 @@ function Game(canvasId) {
             start[key] = obj[key];
         }
         const startT = game.t;
-        const stop = game.update.add(function() {
+        return game.update.add(function() {
             for (let key in props()) {
                 obj[key] = start[key] + ease((game.t-startT)/duration) * (props()[key] - start[key]);
-                console.log(obj[key])
             }
             if (game.t - startT >= duration) {
-                stop();
                 onFinish && onFinish();
+                return REMOVE_SELF;
             }
         });
-        return stop;
     };
 
     for (let name in easing) {
@@ -232,12 +239,18 @@ function Game(canvasId) {
 
     game.delay = function(time, fn) {
         const stop = game.update.add(function() {
-            if (--time === 0) {
+            if (--time <= 0) {
                 fn();
                 stop();
             }
         });
     };
+
+    game.advance = function(frames) {
+        for (let i = 0; i < frames; i++) {
+            game.update();
+        }
+    }
 
     return game;
 }
@@ -466,6 +479,16 @@ controlChain.add(function() {
     }
 });
 
+controlChain.hasMoved = false;
+controlChain.firstMovement = makeChain();
+controlChain.add(function() {
+    if (player.inertia.x || player.inertia.y) {
+        controlChain.firstMovement();
+        controlChain.hasMoved = true;
+        return REMOVE_SELF;
+    }
+});
+
 function createPlayer() {
     player = spawnPlayer(0, 0);
     player.die.add(player.updating.add(controlChain));
@@ -497,26 +520,47 @@ function story(parts) {
     } else {
         if (typeof first === 'function') {
             first();
-        } else {
+        } else if (first.text) {
             messages.push(first);
+        } else {
+            first[0].apply(null, first.slice(1));
+            const delay = first[first.length-1];
+            if (Number.isInteger(delay)) {
+                if (typeof parts[0] === 'number') {
+                    parts[0] += delay / 60;
+                } else {
+                    parts.unshift(delay / 60);
+                }
+            }
         }
         story(parts);
     }
 }
-/*story([
-    function() { game.camera.scale = 0.5, game.camera.x = 1000; },
+story([
+    function() { game.camera.scale = 0.1, game.camera.x = 500; },
     2,
-    characters.red('So, did you finish your new drone design?'),
+    characters.red("So, did you finish your new drone design?"),
     3.5,
-    characters.blue('Almost there...'),
+    characters.blue("Almost there..."),
     3,
-    characters.blue('Done! Check this'),
+    characters.blue("Done! Check this."),
     1,
-    function() { game.to(game.camera, {scale: 2, x: 0, y: 0}, 50); },
-    1,
+    [game.to, game.camera, {scale: 2, x: 0, y: 0}, 120],
     createPlayer,
-    function() { player.alpha = 0; game.to(player, {alpha: 1}, 60); },
-]);*/
+    [controlChain.firstMovement.add, function() {
+        game.to(game.camera, {scale: 1}, 180);
+    }],
+    function() { player.alpha = 0; game.to(player, {alpha: 1}); },
+    2,
+    characters.red("Looks nice. What's the green dot?"),
+    3,
+    characters.blue("Battery."),
+    2,
+    characters.red("Looks small."),
+    2,
+    characters.blue("I'm sure it'll be fine."),
+]);
+game.advance(15 * 60);
 
 /*
 let drone = addObject({x: 0, y: 0, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
