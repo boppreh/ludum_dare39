@@ -18,6 +18,7 @@ function makeChain() {
     const head = {prev: null, next: null, fn: function(){}};
     let tail = head;
     function fire(arg, before, after) {
+        fire.hasFired = true;
         let node = head;
         while (node !== null) {
             if (before) before();
@@ -28,6 +29,7 @@ function makeChain() {
             node = node.next;
         }
     }
+    fire.hasFired = false;
     fire.add = function(fn) {
         const node = {prev: tail, next: null, fn: fn};
         tail.next = node;
@@ -41,10 +43,33 @@ function makeChain() {
         };
         return node.remove;
     }
+    fire.wait = function(filter, callback) {
+        fire.add(function(arg) {
+            if (filter(arg)) {
+                callback(arg);
+                return REMOVE_SELF;
+            }
+        });
+    }
     fire.isEmpty = function() {
         return head === tail;
     }
     return fire;
+}
+function select(pairs, onAny) {
+    let removers = [];
+    for (let i = 0; i < pairs.length; i++) {
+        const chain = pairs[i][0];
+        const callback = pairs[i][1];
+        removers.push(chain.add(function(arg) {
+            callback(arg);
+            onAny && onAny(arg);
+            for (let i = 0; i < removers.length; i++) {
+                removers[i]();
+            }
+            removers = [];
+        }));
+    }
 }
 
 function absTrig(angle, cos, sin) {
@@ -245,6 +270,12 @@ function Game(canvasId) {
             }
         });
     };
+
+    game.timer = function(time) {
+        const chain = makeChain();
+        game.delay(time, chain)
+        return chain;
+    }
 
     game.advance = function(frames) {
         for (let i = 0; i < frames; i++) {
@@ -479,15 +510,8 @@ controlChain.add(function() {
     }
 });
 
-controlChain.hasMoved = false;
 controlChain.firstMovement = makeChain();
-controlChain.add(function() {
-    if (player.inertia.x || player.inertia.y) {
-        controlChain.firstMovement();
-        controlChain.hasMoved = true;
-        return REMOVE_SELF;
-    }
-});
+controlChain.wait(function() { return player.inertia.x || player.inertia.y }, controlChain.firstMovement);
 
 function createPlayer() {
     player = spawnPlayer(0, 0);
@@ -537,7 +561,7 @@ function story(parts) {
     }
 }
 story([
-    function() { game.camera.scale = 0.1, game.camera.x = 500; },
+    function() { game.camera.scale = 0.1, game.camera.rotation = TAU/4, game.camera.x = 500; },
     2,
     characters.red("So, did you finish your new drone design?"),
     3.5,
@@ -545,22 +569,30 @@ story([
     3,
     characters.blue("Done! Check this."),
     1,
-    [game.to, game.camera, {scale: 2, x: 0, y: 0}, 120],
+    [game.to, game.camera, {rotation: 0, scale: 2, x: 0, y: 0}, 120],
     createPlayer,
     [controlChain.firstMovement.add, function() {
         game.to(game.camera, {scale: 1}, 180);
     }],
     function() { player.alpha = 0; game.to(player, {alpha: 1}); },
     2,
-    characters.red("Looks nice. What's the green dot?"),
+    characters.red("What's the green dot?"),
     3,
     characters.blue("Battery."),
     2,
     characters.red("Looks small."),
     2,
     characters.blue("I'm sure it'll be fine."),
+    2,
+    function() {
+        if (controlChain.firstMovement.hasFired) {
+            characters.red("How to you move it?");
+        } else {
+            characters.red("Does it move?");
+        }
+    },
 ]);
-game.advance(15 * 60);
+game.advance(25 * 60);
 
 /*
 let drone = addObject({x: 0, y: 0, width: 50, height: 50, rotation: 0}, function() {}, function(ctx) {
