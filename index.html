@@ -56,20 +56,13 @@ function makeChain() {
     }
     return fire;
 }
-function select(pairs, onAny) {
-    let removers = [];
-    for (let i = 0; i < pairs.length; i++) {
-        const chain = pairs[i][0];
-        const callback = pairs[i][1];
-        removers.push(chain.add(function(arg) {
-            callback(arg);
-            onAny && onAny(arg);
-            for (let i = 0; i < removers.length; i++) {
-                removers[i]();
-            }
-            removers = [];
-        }));
+function merge(chains) {
+    const merged = makeChain();
+    merged.destroy = makeChain();
+    for (let i = 0; i < chains.length; i++) {
+        merged.destroy.add(chains[i].add(merged));
     }
+    return merged;
 }
 
 function absTrig(angle, cos, sin) {
@@ -230,6 +223,9 @@ function Game(canvasId) {
         obj.destroy.add(game.render.add(obj.rendering));
         if (updateFn) obj.updating.add(updateFn.bind(obj));
         if (renderFn) obj.rendering.add(renderFn.bind(obj));
+        obj.to = function(props, duration, onFinish) {
+            return game.to(obj, props, duration, onFinish);
+        };
         return obj;
     }
 
@@ -573,7 +569,7 @@ const introduction = [
     [game.to, game.camera, {rotation: 0, scale: 2, x: 0, y: 0}, 120],
     createPlayer,
     [controlChain.firstMovement.add, function() {
-        game.to(game.camera, {scale: 1}, 180);
+        game.to(game.camera, {scale: 1}, 120);
     }],
     function() { player.alpha = 0; game.to(player, {alpha: 1}); },
     2,
