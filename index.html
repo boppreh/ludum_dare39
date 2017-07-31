@@ -103,6 +103,7 @@ function Game(canvasId) {
         render: makeChain(),
         update: makeChain(),
         ui: makeChain(),
+        lastNow: performance.now(),
     };
 
     const buffer = document.createElement("canvas");
@@ -122,17 +123,19 @@ function Game(canvasId) {
 
     function updateFrame() {
         game.t++;
+        const newNow = performance.now();
+        game.d = newNow - game.lastNow;
+        game.lastNow = newNow;
 
         game.update();
 
-        frameReady += game.camera.rendersPerFrame + 0.01;
+        frameReady += game.camera.rendersPerFrame;
         if (frameReady >= 1) {
             frameReady -= 1;
             scaling = 1 / (game.camera.pixelation + 1);
 
             bufferCtx.save();
-            bufferCtx.fillStyle = 'black';
-            bufferCtx.fillRect(0, 0, game.width, game.height);
+            bufferCtx.clearRect(0, 0, buffer.width, buffer.height);
             bufferCtx.scale(scaling, scaling);
             bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
             bufferCtx.scale(game.camera.scale, game.camera.scale);
@@ -142,8 +145,7 @@ function Game(canvasId) {
             bufferCtx.restore();
         }
 
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, game.width, game.height);
+        ctx.clearRect(0, 0, canvas.width, game.height);
         ctx.drawImage(buffer, 0, 0, game.width*scaling, game.height*scaling, 0, 0, game.width, game.height);
         ctx.save();
 
