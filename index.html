@@ -16,52 +16,70 @@ const TAU = 2 * Math.PI;
 function makeChain() {
     const head = {prev: null, next: null, fn: function(){}};
     let tail = head;
-    return {
-        add: function(fn) {
-            const node = {prev: tail, next: null, fn: fn};
-            tail.next = node;
-            tail = node;
-            return function() {
-                node.prev.next = node.next;
-                if (node.next) node.next.prev = node.prev;
-                if (tail === node) {
-                    tail = node.prev;
-                }
-            };
-        },
-        fire: function(arg, before, after) {
-            let node = head;
-            while (node !== null) {
-                if (before) before();
-                node.fn(arg);
-                if (after) after();
-                node = node.next;
+    function fire(arg, before, after) {
+        let node = head;
+        while (node !== null) {
+            if (before) before();
+            node.fn(arg);
+            if (after) after();
+            node = node.next;
+        }
+    }
+    fire.add = function(fn) {
+        const node = {prev: tail, next: null, fn: fn};
+        tail.next = node;
+        tail = node;
+        return function() {
+            node.prev.next = node.next;
+            if (node.next) node.next.prev = node.prev;
+            if (tail === node) {
+                tail = node.prev;
             }
-        }
+        };
     }
-}
-
-function lerp(obj, props, duration, onFinish) {
-    duration = duration || 1;
-    const start = {};
-    for (let key in props) {
-        start[key] = obj[key];
-    }
-    const startT = game.t;
-    const stop = game.updating.add(function() {
-        for (let key in props) {
-            obj[key] = start[key] + (game.t - startT) * (props[key] - start[key]) / duration;
-        }
-        if (game.t - startT >= duration) {
-            stop();
-            onFinish && onFinish();
-        }
-    });
-    return stop;
+    return fire;
 }
 
 function absTrig(angle, cos, sin) {
     return Math.abs(Math.cos(angle))*cos + Math.abs(Math.sin(angle))*sin;
+};
+
+const easing = {
+    // https://gist.github.com/gre/1650294
+    // no easing, no acceleration
+    linear: function (t) { return t },
+    // accelerating from zero velocity
+    quadIn: function (t) { return t*t },
+    // decelerating to zero velocity
+    quadOut: function (t) { return t*(2-t) },
+    // acceleration until halfway, then deceleration
+    quadInOut: function (t) { return t<.5 ? 2*t*t : -1+(4-2*t)*t },
+    // accelerating from zero velocity 
+    cubicIn: function (t) { return t*t*t },
+    // decelerating to zero velocity 
+    cubicOut: function (t) { return (--t)*t*t+1 },
+    // acceleration until halfway, then deceleration 
+    cubicInOut: function (t) { return t<.5 ? 4*t*t*t : (t-1)*(2*t-2)*(2*t-2)+1 },
+    // accelerating from zero velocity 
+    quartIn: function (t) { return t*t*t*t },
+    // decelerating to zero velocity 
+    quartOut: function (t) { return 1-(--t)*t*t*t },
+    // acceleration until halfway, then deceleration
+    quartInOut: function (t) { return t<.5 ? 8*t*t*t*t : 1-8*(--t)*t*t*t },
+    // accelerating from zero velocity
+    quintIn: function (t) { return t*t*t*t*t },
+    // decelerating to zero velocity
+    quintOut: function (t) { return 1+(--t)*t*t*t*t },
+    // acceleration until halfway, then deceleration 
+    quintInOut: function (t) { return t<.5 ? 16*t*t*t*t*t : 1+16*(--t)*t*t*t*t },
+    // elastic stretch effect at the beginning
+    elasticIn: function (t) { return (.04 - .04 / t) * Math.sin(25 * t) + 1 },
+    // elastic stretch effect at the end
+    elasticOut: function (t) { return .04 * t / (--t) * Math.sin(25 * t) },
+    // elastic stretch effect at the beginning and end
+    elasticInOut: function (t) { return (t -= .5) < 0 ? (.01 + .01 / t) * Math.sin(50 * t) : (.02 - .01 / t) * Math.sin(50 * t) + 1 },
+    // bouncing at the end
+    bounce: function (t) { return 1 - Math.abs(1 - easing.elasticIn(t)); },
 };
 
 function Game(canvasId) {
@@ -79,10 +97,10 @@ function Game(canvasId) {
         pressedKeys: {},
         width: canvas.width,
         height: canvas.height,
-        camera: {x: 0, y: 0, scale: 1, rotation: 0, pixelation: 0, renderingsPerFrame: 1},
+        camera: {x: 0, y: 0, scale: 1, rotation: 0, pixelation: 0, rendersPerFrame: 1},
         t: 0,
-        rendering: makeChain(),
-        updating: makeChain(),
+        render: makeChain(),
+        update: makeChain(),
         ui: makeChain(),
     };
 
@@ -104,9 +122,9 @@ function Game(canvasId) {
     function updateFrame() {
         game.t++;
 
-        game.updating.fire();
+        game.update();
 
-        frameReady += game.camera.renderingsPerFrame + 0.01;
+        frameReady += game.camera.rendersPerFrame + 0.01;
         if (frameReady >= 1) {
             frameReady -= 1;
             scaling = 1 / (game.camera.pixelation + 1);
@@ -119,7 +137,7 @@ function Game(canvasId) {
             bufferCtx.scale(game.camera.scale, game.camera.scale);
             bufferCtx.rotate(game.camera.rotation);
             bufferCtx.translate(Math.round(-game.camera.x), Math.round(-game.camera.y));
-            game.rendering.fire(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
+            game.render(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
             bufferCtx.restore();
         }
 
@@ -127,7 +145,7 @@ function Game(canvasId) {
         ctx.drawImage(buffer, 0, 0, game.width*scaling, game.height*scaling, 0, 0, game.width, game.height);
         ctx.save();
 
-        game.ui.fire(ctx, ctx.save.bind(ctx), ctx.restore.bind(ctx));
+        game.ui(ctx, ctx.save.bind(ctx), ctx.restore.bind(ctx));
 
         ctx.restore();
 
@@ -170,11 +188,37 @@ function Game(canvasId) {
         obj.updating = makeChain();
         obj.rendering = makeChain();
         obj.destroy = makeChain();
-        obj.destroy.add(game.updating.add(obj.updating.fire));
-        obj.destroy.add(game.rendering.add(obj.rendering.fire));
+        obj.destroy.add(game.update.add(obj.updating));
+        obj.destroy.add(game.render.add(obj.rendering));
         if (updateFn) obj.updating.add(updateFn.bind(obj));
         if (renderFn) obj.rendering.add(renderFn.bind(obj));
         return obj;
+    }
+
+    game.interpolate = function(obj, props, duration, onFinish, fn) {
+        duration = duration || 1;
+        const start = {};
+        for (let key in props) {
+            start[key] = obj[key];
+        }
+        const startT = game.t;
+        const stop = game.update.add(function() {
+            for (let key in props) {
+                obj[key] = start[key] + fn((game.t-startT)/duration) * (props[key] - start[key]);
+            }
+            if (game.t - startT >= duration) {
+                stop();
+                onFinish && onFinish();
+            }
+        });
+        return stop;
+    }
+
+    for (let name in easing) {
+        const fn = easing[name]
+        game[name] = function(obj, props, duration, onFinish) {
+            game.interpolate(obj, props, duration, onFinish, fn);
+        };
     }
 
     return game;
@@ -188,7 +232,7 @@ const gridSize = 80;
 let player = null;
 const messages = [];
 let exclusionZones;
-game.updating.add(function() {
+game.update.add(function() {
     exclusionZones = [];
 })
 
@@ -203,7 +247,7 @@ function addExclusionZone(obj, color) {
 }
 
 // Draw infinite grid.
-game.rendering.add(function(ctx) {
+game.render.add(function(ctx) {
     const horizontal = game.width/2/game.camera.scale;
     const vertical = game.height/2/game.camera.scale;
 
@@ -248,7 +292,7 @@ game.rendering.add(function(ctx) {
 });
 
 // Update messages.
-game.updating.add(function() {
+game.update.add(function() {
     for (let i = messages.length-1; i >= 0; i--) {
         const message = messages[i];
         message.time -= 1;
@@ -405,20 +449,20 @@ controlChain.add(function() {
     //player.battery -= player.batteryDrain;
     let quality = Math.min(0.5, player.battery) * 2;
     game.camera.pixelation = 16 * (1-quality);
-    game.camera.renderingsPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
+    game.camera.rendersPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
 });
 controlChain.add(updateDirectMovement);
 controlChain.add(function() {
     if (game.pressedKeys['space'] && player.age > 60) {
         player.die();
         createPlayer();
+        game.bounce(game.camera, {x: player.x, y: player.y}, 30);
     }
 });
 
 function createPlayer() {
     player = spawnPlayer(0, 0);
-    player.die.add(player.updating.add(controlChain.fire));
-    lerp(game.camera, {x: player.x, y: player.y}, 30);
+    player.die.add(player.updating.add(controlChain));
 }
 
 createPlayer();
