@@ -197,17 +197,6 @@ function Game(canvasId) {
         height: canvas.height,
         t: 0,
         lastNow: performance.now(),
-    }, function() {
-        const newNow = performance.now();
-        this.d = newNow - this.lastNow;
-        this.lastNow = newNow;
-        this.t++;
-
-        this.width = canvas.width;
-        this.height = canvas.height;
-    });
-
-    game.camera = game.add({
         x: 0,
         y: 0,
         scale: 1,
@@ -216,23 +205,30 @@ function Game(canvasId) {
         rendersPerFrame: 1,
         frameReady: 0,
     }, function() {
-        this.frameReady += game.camera.rendersPerFrame;
+        const newNow = performance.now();
+        this.d = newNow - this.lastNow;
+        this.lastNow = newNow;
+        this.t++;
+
+        this.frameReady += game.rendersPerFrame;
     });
 
     function updateFrame() {
         game.update();
+        if (game.width !== canvas.width) canvas.width = buffer.width = game.width;
+        if (game.height !== canvas.height) canvas.height = buffer.height = game.height;
         
-        const bufferScale = 1 / (game.camera.pixelation + 1);
-        if (game.camera.frameReady >= 1) {
-            game.camera.frameReady -= 1;
+        const bufferScale = 1 / (game.pixelation + 1);
+        if (game.frameReady >= 1) {
+            game.frameReady -= 1;
 
             bufferCtx.save();
             bufferCtx.clearRect(0, 0, buffer.width, buffer.height);
             bufferCtx.scale(bufferScale, bufferScale);
             bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
-            bufferCtx.scale(game.camera.scale, game.camera.scale);
-            bufferCtx.rotate(game.camera.rotation);
-            bufferCtx.translate(Math.round(-game.camera.x), Math.round(-game.camera.y));
+            bufferCtx.scale(game.scale, game.scale);
+            bufferCtx.rotate(game.rotation);
+            bufferCtx.translate(Math.round(-game.x), Math.round(-game.y));
             game.render(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
             bufferCtx.restore();
         }
@@ -246,6 +242,11 @@ function Game(canvasId) {
         window.requestAnimationFrame(updateFrame);
     }
     window.requestAnimationFrame(updateFrame);
+
+    window.addEventListener("resize", function() {
+        game.width = canvas.width;
+        game.height = canvas.height;
+    });
 
     const KEY_NAME_BY_KEYCODE = {
         32: 'space', 37: 'left', 38: 'up', 39: 'right',
@@ -305,8 +306,8 @@ function addExclusionZone(obj, color) {
 
 // Draw infinite grid.
 game.render.add(function(ctx) {
-    const horizontal = game.width/2/game.camera.scale;
-    const vertical = game.height/2/game.camera.scale;
+    const horizontal = game.width/2/game.scale;
+    const vertical = game.height/2/game.scale;
 
     ctx.scale(gridSize, gridSize);
     // Cell center is inside rectangle, not corners.
@@ -323,12 +324,12 @@ game.render.add(function(ctx) {
     ctx.strokeStyle = '#005500';
     ctx.lineWidth = 1/gridSize;
     const topLeft = {
-        x: Math.floor((game.camera.x-absTrig(game.camera.rotation, horizontal, vertical))/gridSize)-1,
-        y: Math.floor((game.camera.y-absTrig(game.camera.rotation, vertical, horizontal))/gridSize)-1,
+        x: Math.floor((game.x-absTrig(game.rotation, horizontal, vertical))/gridSize)-1,
+        y: Math.floor((game.y-absTrig(game.rotation, vertical, horizontal))/gridSize)-1,
     }
     const bottomRight = {
-        x: Math.ceil((game.camera.x+absTrig(game.camera.rotation, horizontal, vertical))/gridSize),
-        y: Math.ceil((game.camera.y+absTrig(game.camera.rotation, vertical, horizontal))/gridSize),
+        x: Math.ceil((game.x+absTrig(game.rotation, horizontal, vertical))/gridSize),
+        y: Math.ceil((game.y+absTrig(game.rotation, vertical, horizontal))/gridSize),
     }
     ctx.beginPath();
     for (let x = topLeft.x; x <= bottomRight.x; x++) {
@@ -392,7 +393,7 @@ function updateDirectMovement() {
     
     player.x += player.inertia.x;
     player.y += player.inertia.y;
-    game.camera.rotation = 0;
+    game.rotation = 0;
 }
 
 function updateVehicleMovement() {
@@ -402,7 +403,7 @@ function updateVehicleMovement() {
     if (game.pressedKeys['down']) player.inertia.speed -= player.movementForce;
     player.x += Math.cos(player.rotation) * player.inertia.speed;
     player.y += Math.sin(player.rotation) * player.inertia.speed;
-    game.camera.rotation = -player.rotation - TAU/4;
+    game.rotation = -player.rotation - TAU/4;
 }
 
 function updateDriftMovement() {
@@ -419,7 +420,7 @@ function updateDriftMovement() {
     player.rotation += player.inertia.rotation;
     player.x += player.inertia.x;
     player.y += player.inertia.y;
-    game.camera.rotation = -player.rotation - TAU/4;
+    game.rotation = -player.rotation - TAU/4;
 }
 
 function spawnPlayer(x, y) {
@@ -488,20 +489,20 @@ function spawnPlayer(x, y) {
 
 const controlChain = makeChain();
 controlChain.add(function() {
-    game.camera.x = player.x + player.inertia.x * 2;
-    game.camera.y = player.y + player.inertia.y * 2;
+    game.x = player.x + player.inertia.x * 2;
+    game.y = player.y + player.inertia.y * 2;
 
     //player.battery -= player.batteryDrain;
     let quality = Math.min(0.5, player.battery) * 2;
-    game.camera.pixelation = 16 * (1-quality);
-    game.camera.rendersPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
+    game.pixelation = 16 * (1-quality);
+    game.rendersPerFrame = 0.95 * Math.pow(quality, 3) + 0.05;
 });
 controlChain.add(updateDirectMovement);
 controlChain.add(function() {
     if (game.pressedKeys['shift'] && player.age > 60) {
         player.die();
         createPlayer();
-        game.camera.to(function() { return {x: player.x, y: player.y}; }, 30);
+        game.to(function() { return {x: player.x, y: player.y}; }, 30);
     }
 });
 
@@ -557,7 +558,7 @@ function story(parts) {
 }
 
 const introduction = [
-    function() { game.camera.scale = 0.1, game.camera.rotation = TAU/4, game.camera.x = 500; },
+    function() { game.scale = 0.1, game.rotation = TAU/4, game.x = 500; },
     2,
     characters.red("So, did you finish your new drone design?"),
     3.5,
@@ -565,10 +566,10 @@ const introduction = [
     3,
     characters.blue("Done! Check this."),
     1,
-    [game.camera.to, {rotation: 0, scale: 2, x: 0, y: 0}, 120],
+    [game.to, {rotation: 0, scale: 2, x: 0, y: 0}, 120],
     createPlayer,
     [controlChain.firstMovement.add, function() {
-        game.camera.to({scale: 1}, 120);
+        game.to({scale: 1}, 120);
     }],
     function() { player.alpha = 0; player.to({alpha: 1}); },
     2,
