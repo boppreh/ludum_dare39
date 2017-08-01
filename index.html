@@ -69,6 +69,33 @@ function absTrig(angle, cos, sin) {
     return Math.abs(Math.cos(angle))*cos + Math.abs(Math.sin(angle))*sin;
 };
 
+function bounds(obj) {
+    const horizontal = absTrig(obj.rotation, obj.width, obj.height);
+    const vertical = absTrig(obj.rotation, obj.height, obj.width);
+    return {
+        x: obj.x - horizontal/2,
+        y: obj.y - vertical/2,
+        width: horizontal,
+        height: vertical,
+    };
+}
+
+function testCollisions(listA, listB, callback) {
+    const boundsB = [];
+    for (let i = 0; i < listB.length; i++) {
+        boundsB.push(bounds(listB[i]));
+    }
+    for (let indexA = 0; indexA < listA.length; indexA++) {
+        const a = bounds(listA[indexA]);
+        for (let indexB = 0; indexB < listB.length; indexB++) {
+            const b = boundsB[indexB];
+            if ((a.x+a.width >= b.x && a.x <= b.x+b.width) && (a.y+a.height >= b.y && a.y <= b.y+b.height)) {
+                callback(listA[indexA], listB[indexB]);
+            }
+        }
+    }
+}
+
 const easing = {
     // https://gist.github.com/gre/1650294
     // no easing, no acceleration
@@ -499,7 +526,7 @@ controlChain.add(function() {
 });
 controlChain.add(updateDirectMovement);
 controlChain.add(function() {
-    if (game.pressedKeys['shift'] && player.age > 60) {
+    if (game.pressedKeys['shift'] && player.age > 30) {
         player.die();
         createPlayer();
         game.to(function() { return {x: player.x, y: player.y}; }, 30);
@@ -509,10 +536,18 @@ controlChain.add(function() {
 controlChain.firstMovement = makeChain();
 controlChain.wait(function() { return player.inertia.x || player.inertia.y }, controlChain.firstMovement);
 
+const oldPlayers = [];
 function createPlayer() {
+    if (player) oldPlayers.push(player);
     player = spawnPlayer(0, 0);
     player.die.add(player.update.add(controlChain));
 }
+
+game.update.add(function() {
+    if (!player) return;
+    oldPlayers.forEach(b=>b.alpha=1);
+    testCollisions([player], oldPlayers, (a, b)=>b.alpha=0.2);
+});
 
 const defaultMessageTime = 360;
 const characters = {
