@@ -106,7 +106,6 @@ const easing = {
     // bouncing at the end
     bounce: function (t) { return 1 - Math.abs(1 - easing.elasticIn(t)); },
 };
-easing.to = easing.quadInOut;
 
 function Game(canvasId) {
     const canvas = canvasId ? document.getElementById(canvasId) : document.getElementsByTagName('canvas')[0];
@@ -118,52 +117,118 @@ function Game(canvasId) {
     const ctx = canvas.getContext('2d');
     ctx.webkitImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
-
-    const game = {
-        pressedKeys: {},
-        width: canvas.width,
-        height: canvas.height,
-        camera: {x: 0, y: 0, scale: 1, rotation: 0, pixelation: 0, rendersPerFrame: 1},
-        t: 0,
-        render: makeChain(),
-        update: makeChain(),
-        ui: makeChain(),
-        lastNow: performance.now(),
-    };
-    game.update.add(function() {
-        game.t++;
-
-        const newNow = performance.now();
-        game.d = newNow - game.lastNow;
-        game.lastNow = newNow;
-    });
-
     const buffer = document.createElement("canvas");
     buffer.style['image-rendering'] = '-moz-crisp-edges';
     buffer.style['image-rendering'] = '-webkit-optimize-contrast';
     buffer.style['image-rendering'] = '-o-crisp-edges';
     buffer.style['image-rendering'] = 'crisp-edges';
     buffer.style['-ms-interpolation-mode'] = 'nearest-neighbor;';
-    buffer.width = game.width;
-    buffer.height = game.height;
+    buffer.width = canvas.width;
+    buffer.height = canvas.height;
     const bufferCtx = buffer.getContext('2d');
     bufferCtx.webkitImageSmoothingEnabled = false;
     bufferCtx.imageSmoothingEnabled = false;
 
-    let frameReady = 0;
-    let scaling = 1;
+    function makeDynamicObject(obj, updateFn, renderFn, renderUiFn) {
+        obj.destroy = makeChain();
+        obj.update = makeChain();
+        if (updateFn) obj.update.add(updateFn.bind(obj));
+        obj.render = makeChain();
+        if (renderFn) obj.render.add(renderFn.bind(obj));
+        obj.ui = makeChain();
+        if (renderUiFn) obj.ui.add(renderUiFn.bind(obj));
+        obj.add = function(subObj, subUpdateFn, subRenderFn, subRenderUiFn) {
+            makeDynamicObject(subObj, subUpdateFn, subRenderFn, subRenderUiFn);
+            subObj.destroy.add(obj.update.add(subObj.update));
+            subObj.destroy.add(obj.render.add(subObj.render));
+            subObj.destroy.add(obj.ui.add(subObj.ui));
+            return subObj;
+        };
+        obj.interpolate = function(obj, props, duration, onFinish, ease) {
+            duration = duration || 60;
+            ease = ease || easing.quadInOut;
+            if (typeof props !== "function") {
+                const fixed = props;
+                props = function() { return fixed; };
+            }
+            const start = {};
+            for (let key in props()) {
+                start[key] = obj[key];
+            }
+            const startT = game.t;
+            return obj.update.add(function() {
+                for (let key in props()) {
+                    obj[key] = start[key] + ease((game.t-startT)/duration) * (props()[key] - start[key]);
+                }
+                if (game.t - startT >= duration) {
+                    onFinish && onFinish();
+                    return REMOVE_SELF;
+                }
+            });
+        };
+        obj.to = function(props, duration, onFinish, ease) {
+            obj.interpolate(obj, props, duration, onFinish, ease)
+        };
+
+        obj.delay = function(time, fn) {
+            return obj.update.add(function() {
+                if (--time <= 0) {
+                    fn();
+                    return REMOVE_SELF;
+                }
+            });
+        };
+        obj.timer = function(time) {
+            const chain = makeChain();
+            obj.delay(time, chain);
+            return chain;
+        }
+        obj.advance = function(frames) {
+            for (let i = 0; i < frames; i++) {
+                obj.update();
+            }
+        }
+        return obj;
+    }
+
+    const game = makeDynamicObject({
+        pressedKeys: {},
+        width: canvas.width,
+        height: canvas.height,
+        t: 0,
+        lastNow: performance.now(),
+    }, function() {
+        const newNow = performance.now();
+        this.d = newNow - this.lastNow;
+        this.lastNow = newNow;
+        this.t++;
+
+        this.width = canvas.width;
+        this.height = canvas.height;
+    });
+
+    game.camera = game.add({
+        x: 0,
+        y: 0,
+        scale: 1,
+        rotation: 0,
+        pixelation: 0,
+        rendersPerFrame: 1,
+        frameReady: 0,
+    }, function() {
+        this.frameReady += game.camera.rendersPerFrame;
+    });
 
     function updateFrame() {
         game.update();
-
-        frameReady += game.camera.rendersPerFrame;
-        if (frameReady >= 1) {
-            frameReady -= 1;
-            scaling = 1 / (game.camera.pixelation + 1);
+        
+        const bufferScale = 1 / (game.camera.pixelation + 1);
+        if (game.camera.frameReady >= 1) {
+            game.camera.frameReady -= 1;
 
             bufferCtx.save();
             bufferCtx.clearRect(0, 0, buffer.width, buffer.height);
-            bufferCtx.scale(scaling, scaling);
+            bufferCtx.scale(bufferScale, bufferScale);
             bufferCtx.translate(Math.round(buffer.width/2), Math.round(buffer.height/2));
             bufferCtx.scale(game.camera.scale, game.camera.scale);
             bufferCtx.rotate(game.camera.rotation);
@@ -171,13 +236,11 @@ function Game(canvasId) {
             game.render(bufferCtx, bufferCtx.save.bind(bufferCtx), bufferCtx.restore.bind(bufferCtx));
             bufferCtx.restore();
         }
-
-        ctx.clearRect(0, 0, canvas.width, game.height);
-        ctx.drawImage(buffer, 0, 0, game.width*scaling, game.height*scaling, 0, 0, game.width, game.height);
+        
         ctx.save();
-
+        ctx.clearRect(0, 0, canvas.width, game.height);
+        ctx.drawImage(buffer, 0, 0, game.width*bufferScale, game.height*bufferScale, 0, 0, game.width, game.height);
         game.ui(ctx, ctx.save.bind(ctx), ctx.restore.bind(ctx));
-
         ctx.restore();
 
         window.requestAnimationFrame(updateFrame);
@@ -206,7 +269,7 @@ function Game(canvasId) {
 
         if (!hasCtrl && (isKnownSpecial || isAlpha)) {
             event.preventDefault();
-        }    
+        }
     }
     window.addEventListener('keydown', function(event) {
         processKeyEvent(event, true);
@@ -214,70 +277,6 @@ function Game(canvasId) {
     window.addEventListener('keyup', function(event) {
         processKeyEvent(event, false);
     });
-
-    game.add = function(obj, updateFn, renderFn) {
-        obj.updating = makeChain();
-        obj.rendering = makeChain();
-        obj.destroy = makeChain();
-        obj.destroy.add(game.update.add(obj.updating));
-        obj.destroy.add(game.render.add(obj.rendering));
-        if (updateFn) obj.updating.add(updateFn.bind(obj));
-        if (renderFn) obj.rendering.add(renderFn.bind(obj));
-        obj.to = function(props, duration, onFinish) {
-            return game.to(obj, props, duration, onFinish);
-        };
-        return obj;
-    }
-
-    game.interpolate = function(obj, props, duration, onFinish, ease) {
-        duration = duration || 60;
-        if (typeof props !== "function") {
-            const fixed = props;
-            props = function() { return fixed; };
-        }
-        const start = {};
-        for (let key in props()) {
-            start[key] = obj[key];
-        }
-        const startT = game.t;
-        return game.update.add(function() {
-            for (let key in props()) {
-                obj[key] = start[key] + ease((game.t-startT)/duration) * (props()[key] - start[key]);
-            }
-            if (game.t - startT >= duration) {
-                onFinish && onFinish();
-                return REMOVE_SELF;
-            }
-        });
-    };
-
-    for (let name in easing) {
-        const ease = easing[name];
-        game[name] = function(obj, props, duration, onFinish) {
-            return game.interpolate(obj, props, duration, onFinish, ease);
-        };
-    }
-
-    game.delay = function(time, fn) {
-        const stop = game.update.add(function() {
-            if (--time <= 0) {
-                fn();
-                stop();
-            }
-        });
-    };
-
-    game.timer = function(time) {
-        const chain = makeChain();
-        game.delay(time, chain)
-        return chain;
-    }
-
-    game.advance = function(frames) {
-        for (let i = 0; i < frames; i++) {
-            game.update();
-        }
-    }
 
     return game;
 }
@@ -372,7 +371,7 @@ game.ui.add(function(ctx) {
     ctx.strokeStyle = 'black';
     for (let i = 0; i < messages.length; i++) {
         const message = messages[i];
-        const alpha = easing.to(Math.min(1, message.time/fadeTime));
+        const alpha = easing.quadInOut(Math.min(1, message.time/fadeTime));
         ctx.globalAlpha = alpha;
         ctx.fillStyle = message.color;
         ctx.font = (message.bold ? 'bold ' : '') + fontSize + 'px courier new';
@@ -502,7 +501,7 @@ controlChain.add(function() {
     if (game.pressedKeys['shift'] && player.age > 60) {
         player.die();
         createPlayer();
-        game.to(game.camera, function() { return {x: player.x, y: player.y}; }, 30);
+        game.camera.to(function() { return {x: player.x, y: player.y}; }, 30);
     }
 });
 
@@ -511,7 +510,7 @@ controlChain.wait(function() { return player.inertia.x || player.inertia.y }, co
 
 function createPlayer() {
     player = spawnPlayer(0, 0);
-    player.die.add(player.updating.add(controlChain));
+    player.die.add(player.update.add(controlChain));
 }
 
 const defaultMessageTime = 360;
@@ -566,12 +565,12 @@ const introduction = [
     3,
     characters.blue("Done! Check this."),
     1,
-    [game.to, game.camera, {rotation: 0, scale: 2, x: 0, y: 0}, 120],
+    [game.camera.to, {rotation: 0, scale: 2, x: 0, y: 0}, 120],
     createPlayer,
     [controlChain.firstMovement.add, function() {
-        game.to(game.camera, {scale: 1}, 120);
+        game.camera.to({scale: 1}, 120);
     }],
-    function() { player.alpha = 0; game.to(player, {alpha: 1}); },
+    function() { player.alpha = 0; player.to({alpha: 1}); },
     2,
     characters.red("What's the green dot?"),
     3,
